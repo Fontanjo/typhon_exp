@@ -24,7 +24,6 @@ class Typhon(object):
             loss_functions,
             optim_class,
             opt_metrics,
-            metrics_freq,
             batch_size,
             cuda_device,
             resume
@@ -41,7 +40,6 @@ class Typhon(object):
         self.loss_functions = loss_functions
         self.optim_class = optim_class
         self.opt_metrics = opt_metrics
-        self.metrics_freq = metrics_freq
         self.batch_size = batch_size
         self.cuda_device = cuda_device
         self.resume = resume
@@ -249,9 +247,6 @@ class Typhon(object):
             for batch in self.train_data_loaders[dset_name]:
                 self.train_on_batch(model, dset_name, batch)
 
-
-    # Compute metrics
-    def compute_metrics(self, model, dset_name):
         print(f">>> Collecting performance on training set")
         metrics_training = self.test_model(
             model=model,
@@ -323,15 +318,13 @@ class Typhon(object):
             for dset_name in self.dsets_names:
                 print(f">>> Dset {dset_name}")
                 self.model.train()
-                self.train_step(self.model, dset_name, 'some')
-                if epoch % self.metrics_freq == 0:
-                    metrics_training, metrics_validation = self.compute_metrics(self.model, dset_name)
-                    # Add training and validation metrics for this epoch
-                    print(f">>> Aggregating metrics and saving")
-                    self.aggregate_metrics(metrics_training, 'train', dset_name, epoch, 'trained', 'unfrozen')
-                    self.aggregate_metrics(metrics_validation, 'validation', dset_name, epoch, 'trained', 'unfrozen')
-                    print(f">>> AUC train: {metrics_training['auc']} ")
-                    print(f">>> AUC val: {metrics_validation['auc']} ")
+                metrics_training, metrics_validation = self.train_step(self.model, dset_name, 'some')
+                # Add training and validation metrics for this epoch
+                print(f">>> Aggregating metrics and saving")
+                self.aggregate_metrics(metrics_training, 'train', dset_name, epoch, 'trained', 'unfrozen')
+                self.aggregate_metrics(metrics_validation, 'validation', dset_name, epoch, 'trained', 'unfrozen')
+                print(f">>> AUC train: {metrics_training['auc']} ")
+                print(f">>> AUC val: {metrics_validation['auc']} ")
                 # Save after each epoch, so we can quit and resume at any time
                 model_state = self.model.to_state_dict()
                 torch.save(model_state, self.paths['train_model_p'])
@@ -369,20 +362,18 @@ class Typhon(object):
             for epoch in tqdm(range(self.nb_epochs['spec'])):
                 print(f">>> Epoch {epoch}")
                 self.spec_models[dset_name].train()
-                self.train_step(self.spec_models[dset_name], dset_name, 'all')
-                if epoch % self.metrics_freq == 0:
-                    metrics_training, metrics_validation = self.compute_metrics(self.model, dset_name)
-                    print(f">>> Aggregating metrics")
-                    self.aggregate_metrics(metrics_training, 'train', dset_name, epoch, 'specialized', 'unfrozen')
-                    self.aggregate_metrics(metrics_validation, 'validation', dset_name, epoch, 'specialized', 'unfrozen')
+                metrics_training, metrics_validation = self.train_step(self.spec_models[dset_name], dset_name, 'all')
+                print(f">>> Aggregating metrics")
+                self.aggregate_metrics(metrics_training, 'train', dset_name, epoch, 'specialized', 'unfrozen')
+                self.aggregate_metrics(metrics_validation, 'validation', dset_name, epoch, 'specialized', 'unfrozen')
 
-                    self.compare_models(
-                        model=self.spec_models[dset_name],
-                        dset_name=dset_name,
-                        type='spec',
-                        save_path=self.paths['spec_models_p'][dset_name],
-                        epoch=epoch,
-                        metrics_validation=metrics_validation)
+                self.compare_models(
+                    model=self.spec_models[dset_name],
+                    dset_name=dset_name,
+                    type='spec',
+                    save_path=self.paths['spec_models_p'][dset_name],
+                    epoch=epoch,
+                    metrics_validation=metrics_validation)
 
             # Test the best model (the one that has been saved)
             print(f">> Results for {dset_name}, WITH specialization")
@@ -436,8 +427,7 @@ class Typhon(object):
                     self.model.train()
                     if feature_extractor == 'frozen': self.model.freeze_fe()
                     if feature_extractor == 'unfrozen': self.model.unfreeze_fe()
-                    self.train_step(self.model, dset_name, 'all')
-                    metrics_training, metrics_validation = self.compute_metrics(self.model, dset_name)
+                    metrics_training, metrics_validation = self.train_step(self.model, dset_name, 'all')
                     # Add training and validation metrics for this epoch
                     print(f">>>> Aggregating metrics")
                     self.aggregate_metrics(metrics_training, 'train', dset_name, epoch, 'trained', feature_extractor)
@@ -507,8 +497,7 @@ class Typhon(object):
                 self.spec_models[dset_name].train()
                 if feature_extractor == 'frozen': self.spec_models[dset_name].freeze_fe()
                 if feature_extractor == 'unfrozen': self.spec_models[dset_name].unfreeze_fe()
-                self.train_step(self.spec_models[dset_name], dset_name, 'all')
-                metrics_training, metrics_validation = self.compute_metrics(self.model, dset_name)
+                metrics_training, metrics_validation = self.train_step(self.spec_models[dset_name], dset_name, 'all')
                 print(f">>> Aggregating metrics")
                 self.aggregate_metrics(metrics_training, 'train', dset_name, epoch, 'specialized', feature_extractor)
                 self.aggregate_metrics(metrics_validation, 'validation', dset_name, epoch, 'specialized', feature_extractor)

@@ -69,7 +69,6 @@ class Experiment:
             'loss_functions' : self.loss_functions,
             'optim_class' : self.optimizers,
             'opt_metrics' : self.cfg['opt_metrics'],
-            'metrics_freq': self.cfg['metrics_freq'],
             'cuda_device' : self.cuda_device,
             'resume' : self.cfg['resume'],
         }
