@@ -60,8 +60,8 @@ class Experiment:
             'paths' : self.paths,
             'dsets_names' : self.cfg['dsets'],
             'architecture' : self.cfg['architecture'],
-            'bootstrap_size' : self.cfg['bootstrap_size'],
-            'nb_batches_per_epoch' : self.cfg['nb_batches_per_epoch'],
+            'bootstrap_size' : max(self.cfg['bootstrap_size'], 1),          # Ensure at least 1 for initialization
+            'nb_batches_per_epoch' : self.cfg['nb_batches_per_epoch'],          # TODO: do not test if only 1 (in bootstrap)
             'nb_epochs' : self.cfg['epochs'],
             'lrates' : self.lrates,
             'dropouts' : self.dropouts,
