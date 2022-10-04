@@ -166,13 +166,13 @@ class Experiment:
             self.typhon.bootstrap()
         if self.cfg['transfer'] == 'sequential':
             self.typhon.s_train(self.paths['bootstrap_model'])
-            self.typhon.s_specialization(self.paths['train_model_s'])
+            if self.cfg['epochs']['spec'] > 0: self.typhon.s_specialization(self.paths['train_model_s'])
         if self.cfg['transfer'] == 'parallel':
             if self.cfg['resume']:
                 self.typhon.p_train(self.paths['train_model_p'])
             else:
                 self.typhon.p_train(self.paths['bootstrap_model'])
-            self.typhon.p_specialization(self.paths['train_model_p'])
+            if self.cfg['epochs']['spec'] > 0: self.typhon.p_specialization(self.paths['train_model_p'])
 
         stop = time.perf_counter()
         total_time = stop - start
