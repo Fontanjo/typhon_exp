@@ -2,7 +2,7 @@
 import torch
 import torch.nn as nn
 
-def get_block(dropout, in_chanels=3):
+def get_block(dropout, in_chanels=1):
     return Unet_container(in_chanels=in_chanels)
 
 

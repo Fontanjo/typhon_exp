@@ -8,7 +8,7 @@ import cv2
 
 
 class SegmentationDatasetFolder(torchvision.datasets.DatasetFolder):
-    def __init__(self, loader, cuda_device='cpu', path="datasets_segmentation/Brain/test/", img_dim=(256, 256)):
+    def __init__(self, loader, path, cuda_device='cpu', img_dim=(256, 256)):
         self.loader = loader
         self.cuda_device = cuda_device
         self.imgs_path = path
@@ -25,8 +25,8 @@ class SegmentationDatasetFolder(torchvision.datasets.DatasetFolder):
 
     def __getitem__(self, idx):
         img_path, img_mask_path = self.data[idx]
-        img = self.loader(img_path)
-        img_mask = self.loader(img_mask_path, True)
+        img = self.loader(img_path)[:self.img_dim[0], :self.img_dim[1]]
+        img_mask = self.loader(img_mask_path, True)[:self.img_dim[0], :self.img_dim[1]]
 
         return img, img_mask
 
@@ -98,8 +98,11 @@ def segmentation_loader(cuda_device):
     def the_loader(path, mask=False):
         # Load data
         ary = np.load(path)
+        # Ensure the size is correct
+        ary = np.pad(ary, [(0, 256), (0, 256)])[:256, :256]
         # If mask, add third channel
-        if mask: ary.shape = (1, *ary.shape)
+        # if mask: ary.shape = (1, *ary.shape)
+        ary.shape = (1, *ary.shape)
         # Send the tensor to the GPU/CPU depending on what device is available
         tensor = torch.from_numpy(ary).to(cuda_device)
         return tensor.float()

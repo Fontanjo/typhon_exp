@@ -182,11 +182,6 @@ class Experiment:
         if  self.cfg['initialization'] == 'load':
             assert self.paths['bootstrap_model'].is_file(), f"Bootstrap initialization file missing ({self.paths['bootstrap_model']}), please choose another initialization"
             print("> Loading Bootstrap initialization from ", self.paths['bootstrap_model'])
-
-
-        # if not self.paths['bootstrap_model'].is_file():
-        #     print("> Bootstrap initialization missing:", self.paths['bootstrap_model'])
-        #     self.typhon.bootstrap()
         if self.cfg['transfer'] == 'sequential':
             self.typhon.s_train(self.paths['bootstrap_model'])
             if self.cfg['epochs']['spec'] > 0: self.typhon.s_specialization(self.paths['train_model_s'])
