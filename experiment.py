@@ -60,6 +60,7 @@ class Experiment:
             'paths' : self.paths,
             'dsets_names' : self.cfg['dsets'],
             'architecture' : self.cfg['architecture'],
+            'initialization' : self.cfg['initialization'],
             'bootstrap_size' : max(self.cfg['bootstrap_size'], 1),          # Ensure at least 1 for initialization
             'nb_batches_per_epoch' : self.cfg['nb_batches_per_epoch'],          # TODO: do not test if only 1 (in bootstrap)
             'nb_epochs' : self.cfg['epochs'],
@@ -70,6 +71,7 @@ class Experiment:
             'optim_class' : self.optimizers,
             'opt_metrics' : self.cfg['opt_metrics'],
             'metrics_freq': self.cfg['metrics_freq'],
+            'training_task': self.cfg['training_task'],
             'cuda_device' : self.cuda_device,
             'resume' : self.cfg['resume'],
         }
@@ -160,10 +162,31 @@ class Experiment:
         shutil.copy2('experiment.py', self.paths['experiment'])
 
         self.typhon = typhon.Typhon(**self.train_args)
-        # Ensure bootstrap is initialized
-        if not self.paths['bootstrap_model'].is_file():
-            print("> Bootstrap initialization missing:", self.paths['bootstrap_model'])
+        # Bootstrap initialization
+        if self.cfg['initialization'] == 'bootstrap':
+            # Remove old bootstrap file
+            if self.paths['bootstrap_model'].is_file():
+                print("> Removing old bootstrap model:", self.paths['bootstrap_model'])
+                os.remove(self.paths['bootstrap_model'])
+            # Initialize new bootstrap model
             self.typhon.bootstrap()
+        # Random initialization
+        if self.cfg['initialization'] == 'random':
+            # Remove old bootstrap file
+            if self.paths['bootstrap_model'].is_file():
+                print("> Removing old bootstrap model:", self.paths['bootstrap_model'])
+                os.remove(self.paths['bootstrap_model'])
+            # Initialize new random model
+            self.typhon.random_initialization()
+        # Security check
+        if  self.cfg['initialization'] == 'load':
+            assert self.paths['bootstrap_model'].is_file(), f"Bootstrap initialization file missing ({self.paths['bootstrap_model']}), please choose another initialization"
+            print("> Loading Bootstrap initialization from ", self.paths['bootstrap_model'])
+
+
+        # if not self.paths['bootstrap_model'].is_file():
+        #     print("> Bootstrap initialization missing:", self.paths['bootstrap_model'])
+        #     self.typhon.bootstrap()
         if self.cfg['transfer'] == 'sequential':
             self.typhon.s_train(self.paths['bootstrap_model'])
             if self.cfg['epochs']['spec'] > 0: self.typhon.s_specialization(self.paths['train_model_s'])

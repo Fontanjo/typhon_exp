@@ -16,6 +16,7 @@ class Typhon(object):
             paths,
             dsets_names,
             architecture,
+            initialization,
             bootstrap_size,
             nb_batches_per_epoch,
             nb_epochs,
@@ -25,6 +26,7 @@ class Typhon(object):
             optim_class,
             opt_metrics,
             metrics_freq,
+            training_task,
             batch_size,
             cuda_device,
             resume
@@ -33,6 +35,7 @@ class Typhon(object):
         self.paths = paths
         self.dsets_names = dsets_names
         self.architecture = architecture
+        self.initialization = initialization
         self.bootstrap_size = bootstrap_size
         self.nb_batches_per_epoch = nb_batches_per_epoch
         self.nb_epochs = nb_epochs
@@ -42,17 +45,20 @@ class Typhon(object):
         self.optim_class = optim_class
         self.opt_metrics = opt_metrics
         self.metrics_freq = metrics_freq
+        self.training_task = training_task
         self.batch_size = batch_size
         self.cuda_device = cuda_device
         self.resume = resume
         self.metrics_plot = pd.DataFrame(columns=['type', 'feature_extractor', 'epoch', 'dataset', 'split', 'metric', 'value'])
         self.best_models = {}
         self.nb_dataset = len(self.paths['dsets'])
-        assert self.nb_dataset == 3, 'Double check as long as we work with 3'
+        # assert self.nb_dataset == 3, 'Double check as long as we work with 3'
 
 
     @torch.no_grad()
     def test_model(self, model, dset_name, test_data_loader, verbose=False):
+        if self.training_task == 'segmentation':
+            return self.test_segmentation_model(model, dset_name, test_data_loader, verbose)
         # This only sets the model to "eval mode" (and disables specific
         # layers such as dropout and batchnorm). Opposite: `model.train()`
         model.eval()
@@ -99,6 +105,60 @@ class Typhon(object):
         end = time.perf_counter()
 
         metrics_test =  utils.get_metrics(self.loss_functions[dset_name], confusion_matrix_dict, predictions_per_batch)
+
+        if verbose:
+            summary_text = f"""
+            SUMMARY OF THE CLASSIFIER ON TEST SET :
+
+            -------------------
+            Loss: {metrics_test['loss']}
+            Accuracy: {metrics_test['accuracy']}
+            Precision:{metrics_test['precision']}
+            Recall:   {metrics_test['recall']}
+            F1 score: {metrics_test['f1score']}
+            Specificity: {metrics_test['specificity']}
+            AUC: {metrics_test['auc']}
+            --------------------
+            Running time: {end-start}
+
+            """
+
+            print(summary_text)
+
+        return metrics_test
+
+    @torch.no_grad()
+    def test_segmentation_model(self, model, dset_name, test_data_loader, verbose=False):
+        # This only sets the model to "eval mode" (and disables specific
+        # layers such as dropout and batchnorm). Opposite: `model.train()`
+        model.eval()
+        assert model.training == False, "Model not in eval mode"
+
+        # Send model to GPU if available
+        model.to(self.cuda_device)
+
+        # List of predictions to compute AUC (float)
+        predictions_per_batch = {'labels': [], 'predictions_positive_class': [], 'raw_predictions': torch.tensor([]).to(self.cuda_device), 'labels_tensor': torch.tensor([]).to(self.cuda_device)}
+
+        start = time.perf_counter()
+
+        # For each batch
+        for inputs, labels in test_data_loader:
+            # Send data to GPU if available
+            inputs, labels = inputs.to(self.cuda_device), labels.to(self.cuda_device)
+            # Feed the model and get outputs
+            # Raw, unnormalized output required to compute the loss (with CrossEntropyLoss)
+            outputs = model(inputs, dset_name)
+
+            predictions_per_batch['raw_predictions'] = torch.cat((predictions_per_batch['raw_predictions'], outputs), 0)
+            predictions_per_batch['labels_tensor'] = torch.cat((predictions_per_batch['labels_tensor'].long(), labels), 0)
+
+        end = time.perf_counter()
+
+
+
+
+        metrics_test = utils.get_segmentation_metrics(self.loss_functions[dset_name], predictions_per_batch)
 
         if verbose:
             summary_text = f"""
@@ -173,7 +233,8 @@ class Typhon(object):
                     # Use both train and val sets, more data for bootstrap!
                     which=['train', 'val'],
                     batch_size=self.batch_size['train'],
-                    cuda_device=self.cuda_device)
+                    cuda_device=self.cuda_device,
+                    training_task=self.training_task)
 
                 self.bootstrap_data_loaders[dset_name] = bootstrap_loop_loader.data_loader
                 print(f">> Data loaded for dataset {self.paths['dsets'][dset_name]}")
@@ -190,19 +251,22 @@ class Typhon(object):
                     dset_path=self.paths['dsets'][dset_name],
                     which=['train'],
                     batch_size=self.batch_size[type],
-                    cuda_device=self.cuda_device)
+                    cuda_device=self.cuda_device,
+                    training_task=self.training_task)
 
                 validation_loop_loader = utils.LoopLoader(
                     dset_path=self.paths['dsets'][dset_name],
                     which=['val'],
                     batch_size=self.batch_size[type],
-                    cuda_device=self.cuda_device)
+                    cuda_device=self.cuda_device,
+                    training_task=self.training_task)
 
                 test_loop_loader = utils.LoopLoader(
                     dset_path=self.paths['dsets'][dset_name],
                     which=['test'],
                     batch_size=1,
-                    cuda_device=self.cuda_device)
+                    cuda_device=self.cuda_device,
+                    training_task=self.training_task)
 
                 self.train_loop_loaders[dset_name] = train_loop_loader
                 self.train_data_loaders[dset_name] = train_loop_loader.data_loader
@@ -609,6 +673,24 @@ class Typhon(object):
         print("> Bootstrap done, best model is saved:")
         for dset_name in self.dsets_names:
             print(f"> {self.opt_metrics['bootstrap']} score for {dset_name}: {best[dset_name][self.opt_metrics['bootstrap']]}")
+
+
+    def random_initialization(self):
+        utils.print_time("RANDOM INITIALIZATION")
+
+        # Take the dropouts of the training (no impact since we only test)
+        dropout_fe, dropouts_dm = self.dropouts['train']
+
+        model = TyphonModel(
+            dropout_fe=dropout_fe,
+            dropouts_dm=dropouts_dm,
+            architecture=self.architecture,
+            dsets_names=self.dsets_names)
+
+        torch.save(model.to_state_dict(), self.paths['bootstrap_model'])
+
+        print("> Random initialization done, model is saved")
+
 
 
     def aggregate_metrics(self, metrics, split, dset_name, epoch, type, feature_extractor):
