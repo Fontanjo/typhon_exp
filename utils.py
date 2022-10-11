@@ -3,6 +3,33 @@ import datetime
 import sklearn.metrics
 import torch
 import torchvision
+import glob
+import cv2
+
+
+class SegmentationDatasetFolder(torchvision.datasets.DatasetFolder):
+    def __init__(self, loader, cuda_device='cpu', path="datasets_segmentation/Brain/test/", img_dim=(256, 256)):
+        self.loader = loader
+        self.cuda_device = cuda_device
+        self.imgs_path = path
+        file_list = glob.glob(self.imgs_path + "*[!_mask].npy") # All non-mask
+        self.data = []
+        for img in file_list:
+            mask = img[:-4] + "_mask.npy"
+            self.data.append([img, mask])
+        self.img_dim = img_dim
+        self.num_samples = len(self.data)
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        img_path, img_mask_path = self.data[idx]
+        img = self.loader(img_path)
+        img_mask = self.loader(img_mask_path, True)
+
+        return img, img_mask
+
 
 
 class LoopLoader():
@@ -10,20 +37,32 @@ class LoopLoader():
             dset_path,
             which, # '['train', 'test', 'val']'
             batch_size,
-            cuda_device
+            cuda_device,
+            training_task='classification'
         ):
 
         self.dset_path = dset_path
         self.which = which
         self.batch_size = batch_size
         self.cuda_device = cuda_device
+        self.training_task = training_task
 
-        # For a list of which, we concatenate
-        self.ds_folder = torch.utils.data.ConcatDataset([torchvision.datasets.DatasetFolder(
-            root=f"{dset_path}/{split}",
-            extensions="npy",
-            loader=gen_loader(self.cuda_device))
+        if self.training_task == 'classification':
+            # For a list of which, we concatenate
+            self.ds_folder = torch.utils.data.ConcatDataset([torchvision.datasets.DatasetFolder(
+                root=f"{dset_path}/{split}",
+                extensions="npy",
+                loader=gen_loader(self.cuda_device))
+                for split in which])
+        elif self.training_task == 'segmentation':
+            self.ds_folder = torch.utils.data.ConcatDataset([SegmentationDatasetFolder(
+            path=f"{dset_path}/{split}/",
+            cuda_device='cpu',
+            loader=segmentation_loader(self.cuda_device))
             for split in which])
+        else:
+            # Todo trow errow and say that task is not valid but shoul be in ['classification', 'segmentation']
+            pass
 
         self.data_loader = torch.utils.data.DataLoader(
             dataset=self.ds_folder,
@@ -53,6 +92,18 @@ class LoopLoader():
 
 def print_time(str):
     print(str, '--', datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+
+
+def segmentation_loader(cuda_device):
+    def the_loader(path, mask=False):
+        # Load data
+        ary = np.load(path)
+        # If mask, add third channel
+        if mask: ary.shape = (1, *ary.shape)
+        # Send the tensor to the GPU/CPU depending on what device is available
+        tensor = torch.from_numpy(ary).to(cuda_device)
+        return tensor.float()
+    return the_loader
 
 
 # Just putting the cuda_device in a closure for the DatasetFolder loader
@@ -116,3 +167,13 @@ def get_metrics(loss_function, confusion_matrix_dict, predictions_per_batch):
         'loss': loss, 'accuracy': accuracy,
         'precision': precision, 'recall': recall,
         'f1score': f1score, 'specificity': specificity, 'auc': auc}
+
+
+def get_segmentation_metrics(loss_function, predictions_per_batch):
+    cel_input = predictions_per_batch['raw_predictions']
+    cel_target = predictions_per_batch['labels_tensor']
+    loss = loss_function(cel_input, cel_target).item()
+    return {
+        'loss': loss, 'accuracy': 0,
+        'precision': 0, 'recall': 0,
+        'f1score': 0, 'specificity': 0, 'auc': 0}
