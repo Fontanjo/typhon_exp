@@ -158,6 +158,7 @@ def get_metrics(loss_function, confusion_matrix_dict, predictions_per_batch):
     else:
         specificity = 0.0
 
+
     y_true = predictions_per_batch['labels']
     y_score = predictions_per_batch['predictions_positive_class']
     auc = sklearn.metrics.roc_auc_score(y_true, y_score)
@@ -205,6 +206,11 @@ def get_segmentation_metrics(loss_function, predictions_per_batch, confusion_mat
     else:
         specificity = 0.0
 
+    if tp + fp + fn:
+        iou = tp / (tp + fp + fn)
+    else:
+        iou = 0.0
+
     pred = predictions_per_batch['raw_predictions']
     label = predictions_per_batch['labels_tensor']
     loss = loss_function(pred, label).item()
@@ -212,7 +218,7 @@ def get_segmentation_metrics(loss_function, predictions_per_batch, confusion_mat
     return {
         'loss': loss, 'accuracy': accuracy,
         'precision': precision, 'recall': recall,
-        'f1score': f1score, 'specificity': specificity, 'auc': 0}
+        'f1score': f1score, 'specificity': specificity, 'auc': 0, 'iou': iou}
 
 
 

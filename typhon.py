@@ -137,7 +137,7 @@ class Typhon(object):
         # Send model to GPU if available
         model.to(self.cuda_device)
 
-        # List of predictions to compute AUC (float)
+        # List of predictions)
         predictions_per_batch = {'labels': [], 'predictions_positive_class': [], 'raw_predictions': torch.tensor([]).to(self.cuda_device), 'labels_tensor': torch.tensor([]).to(self.cuda_device)}
 
         start = time.perf_counter()
@@ -187,7 +187,7 @@ class Typhon(object):
             Recall:   {metrics_test['recall']}
             F1 score: {metrics_test['f1score']}
             Specificity: {metrics_test['specificity']}
-            AUC: {metrics_test['auc']}
+            IoU: {metrics_test['iou']}
             --------------------
             Running time: {end-start}
 
