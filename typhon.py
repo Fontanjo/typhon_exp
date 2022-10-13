@@ -142,6 +142,8 @@ class Typhon(object):
 
         start = time.perf_counter()
 
+        confusion_matrix_dict = {}
+
         # For each batch
         for inputs, labels in test_data_loader:
             # Send data to GPU if available
@@ -153,12 +155,26 @@ class Typhon(object):
             predictions_per_batch['raw_predictions'] = torch.cat((predictions_per_batch['raw_predictions'], outputs), 0)
             predictions_per_batch['labels_tensor'] = torch.cat((predictions_per_batch['labels_tensor'].long(), labels), 0)
 
+            # Set the values of the output to 0 or 1 (tumor at pixel xy or not) and cast to int
+            predicted = (outputs > 0.5).int()
+            labels = labels.int()
+
+            # TODO check efficiency and possibly find a better way
+            tp = torch.sum((predicted==labels) * (predicted==1)).item()
+            tn = torch.sum((predicted==labels) * (predicted==0)).item()
+            fp = torch.sum((predicted!=labels) * (predicted==1)).item()
+            fn = torch.sum((predicted!=labels) * (predicted==0)).item()
+
+            conf_matrix_per_batch = {'TP': tp, 'FP': fp, 'TN': tn, 'FN': fn}
+
+            for key, value in conf_matrix_per_batch.items():
+                confusion_matrix_dict.setdefault(key, []).append(value)
+
         end = time.perf_counter()
 
 
 
-
-        metrics_test = utils.get_segmentation_metrics(self.loss_functions[dset_name], predictions_per_batch)
+        metrics_test = utils.get_segmentation_metrics(self.loss_functions[dset_name], predictions_per_batch, confusion_matrix_dict)
 
         if verbose:
             summary_text = f"""

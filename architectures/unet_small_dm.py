@@ -2,13 +2,7 @@ import torch.nn as nn
 
 def get_block(dropout, num_classes=2):
     return nn.Sequential(
-        #
-        # nn.Conv2d(64, 16, kernel_size=1, padding=0),
+        nn.Conv2d(64, 1, kernel_size=1, padding=0), # Original unet
 
-        nn.Flatten(),
-
-        # nn.Linear(64, 16),
-        # nn.ELU(),
-        #
-        nn.Linear(262144, num_classes)
+        nn.Sigmoid()  # Not (or yes?) in the original model. Added since loss requires values in [0, 1]
     )

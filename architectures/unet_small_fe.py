@@ -77,7 +77,7 @@ class Unet_container(nn.Module):
     # TODO: check if can make bigger (or adapt size to input!)
     # TODO: remove unused parameters
     def forward(self, inputs):
-        inputs = inputs[:,:,:64,:64] # Reshape, since in deconding phase will be a power of 2 and must be equal
+        inputs = inputs[:,:,:256,:256] # Reshape, since in deconding phase will be a power of 2 and must be equal
         """ Encoder """
         # print(f"in: ##### {inputs.size()} #####")
         s1, p1 = self.e1(inputs)
