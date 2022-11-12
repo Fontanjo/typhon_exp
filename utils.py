@@ -98,6 +98,10 @@ def segmentation_loader(cuda_device):
     def the_loader(path, mask=False, dim=(256, 256)):
         # Load data
         ary = np.load(path)
+        # Convert to 1-channel if necessary
+        if len(ary.shape) == 3:
+            ary = ary.transpose(1, 2, 0).dot([0.299, 0.587, 0.114])
+            # print('image converted to 1 channel')
         # Ensure the size is correct
         ary = np.pad(ary, [(0, dim[0]), (0, dim[1])])[:dim[0], :dim[1]]
         # if mask: ary.shape = (1, *ary.shape)
