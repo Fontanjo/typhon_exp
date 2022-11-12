@@ -1,9 +1,7 @@
 # https://medium.com/analytics-vidhya/unet-implementation-in-pytorch-idiot-developer-da40d955f201
-# Slightly modified to always output 1 value for encoder blocks and take 1 input value for deconder blocks
-
 import torch
 import torch.nn as nn
-from architectures.unet_blocks import conv_block, encoder_block, decoder_block
+from architectures.unet_blocks_old import conv_block, encoder_block, decoder_block
 
 def get_block(dropout, in_chanels=1):
     return Unet_container(in_chanels=in_chanels)
@@ -39,10 +37,25 @@ class Unet_container(nn.Module):
         b = self.b(p4)
 
         """ Decoder """
-        d1 = self.d1([b, s4])
-        d2 = self.d2([d1, s3])
-        d3 = self.d3([d2, s2])
-        d4 = self.d4([d3, s1])
+        d1 = self.d1(b, s4)
+        d2 = self.d2(d1, s3)
+        d3 = self.d3(d2, s2)
+        d4 = self.d4(d3, s1)
+
+        # print("####################################")
+        # print("####################################")
+        # print(f'{s1.shape}  ===  {p1.shape}')
+        # print(f'{s2.shape}  ===  {p4.shape}')
+        # print(f'{s3.shape}  ===  {p4.shape}')
+        # print(f'{s4.shape}  ===  {p4.shape}')
+        # print("####################################")
+        # print("####################################")
+        # print(f'{d1.shape}')
+        # print(f'{d2.shape}')
+        # print(f'{d3.shape}')
+        # print(f'{d4.shape}')
+        # print("####################################")
+        # print("####################################")
 
         return d4
 

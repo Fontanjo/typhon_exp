@@ -72,10 +72,9 @@ class Unet_container(nn.Module):
         self.d3 = decoder_block(256, 128)
         self.d4 = decoder_block(128, 64)
 
-        """ Classifier """
-        self.outputs = nn.Conv2d(64, 1, kernel_size=1, padding=0)
 
     def forward(self, inputs):
+        inputs = inputs[:,:,:256,:256] # Reshape, since in deconding phase will be a power of 2 and must be equal
         """ Encoder """
         s1, p1 = self.e1(inputs)
         s2, p2 = self.e2(p1)
@@ -91,10 +90,7 @@ class Unet_container(nn.Module):
         d3 = self.d3(d2, s2)
         d4 = self.d4(d3, s1)
 
-        """ Classifier """
-        outputs = self.outputs(d4)
-
-        return outputs
+        return d4
 
     def __iter__(self):
-        return iter([self.e1, self.e2, self.e3, self.b, self.d1, self.d2, self.d3, self.d4])
+        return iter([self.e1, self.e2, self.e3, self.e4, self.b, self.d4, self.d3, self.d2, self.d1])
