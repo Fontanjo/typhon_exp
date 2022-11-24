@@ -25,8 +25,8 @@ class SegmentationDatasetFolder(torchvision.datasets.DatasetFolder):
 
     def __getitem__(self, idx):
         img_path, img_mask_path = self.data[idx]
-        img = self.loader(img_path)[:self.img_dim[0], :self.img_dim[1]]
-        img_mask = self.loader(img_mask_path, True, self.img_dim)#[:self.img_dim[0], :self.img_dim[1]]
+        img = self.loader(img_path, self.img_dim)#[:self.img_dim[0], :self.img_dim[1]]
+        img_mask = self.loader(img_mask_path, self.img_dim)#[:self.img_dim[0], :self.img_dim[1]]
 
         return img, img_mask
 
@@ -95,7 +95,7 @@ def print_time(str):
 
 
 def segmentation_loader(cuda_device):
-    def the_loader(path, mask=False, dim=(256, 256)):
+    def the_loader(path, dim=(256, 256)):
         # Load data
         ary = np.load(path)
         # Convert to 1-channel if necessary
@@ -106,11 +106,9 @@ def segmentation_loader(cuda_device):
         ary = np.pad(ary, [(0, dim[0]), (0, dim[1])])[:dim[0], :dim[1]]
         # if mask: ary.shape = (1, *ary.shape)
         ary.shape = (1, *ary.shape)
-        # Set the mask in the same scale of the nn output ([0, 1])
-        if mask: ary = np.divide(ary, 255)
         # Send the tensor to the GPU/CPU depending on what device is available
-        tensor = torch.from_numpy(ary).to(cuda_device)
-        return tensor.float()
+        tensor = torch.from_numpy(ary).float().to(cuda_device)
+        return tensor#.float()
     return the_loader
 
 

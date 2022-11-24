@@ -410,8 +410,10 @@ class Typhon(object):
                     print(f">>> Aggregating metrics and saving")
                     self.aggregate_metrics(metrics_training, 'train', dset_name, epoch, 'trained', 'unfrozen')
                     self.aggregate_metrics(metrics_validation, 'validation', dset_name, epoch, 'trained', 'unfrozen')
-                    print(f">>> AUC train: {metrics_training['auc']} ")
-                    print(f">>> AUC val: {metrics_validation['auc']} ")
+                    # print(f">>> AUC train: {metrics_training['auc']} ")
+                    # print(f">>> AUC val: {metrics_validation['auc']} ")
+                    print(f">>> {self.opt_metrics['train']} train: {metrics_training[self.opt_metrics['train']]} ")
+                    print(f">>> {self.opt_metrics['train']} val: {metrics_validation[self.opt_metrics['train']]} ")
                 # Save after each epoch, so we can quit and resume at any time
                 model_state = self.model.to_state_dict()
                 torch.save(model_state, self.paths['train_model_p'])
@@ -617,6 +619,7 @@ class Typhon(object):
 ###############################################################################################################################
 ############################ BOOTSTRAP ########################################################################################
 ###############################################################################################################################
+    @torch.no_grad()
     def bootstrap(self):
         utils.print_time("BOOTSTRAP")
         self.load_data('bootstrap')
@@ -660,6 +663,7 @@ class Typhon(object):
                     continue
 
                 new_score = current[dset_name][self.opt_metrics['bootstrap']]
+# to create bootstrap plot                # print(new_score)
                 best_score = best[dset_name][self.opt_metrics['bootstrap']]
                 if new_score > best_score:
                     nbetterheads += 1
@@ -676,13 +680,22 @@ class Typhon(object):
                 print(f">> One head is <0.5 AUC, throw the model")
                 continue
 
-            # At least two better heads and max difference of 0.2 -> better model
             opt_metrics = [current[dset_name][self.opt_metrics['bootstrap']] for dset_name in self.dsets_names]
-            if (nbetterheads > 1) and ((max(opt_metrics) - min(opt_metrics)) < 0.2):
-                print(f">> New best model")
-                best = current
-                for dset_name in self.dsets_names:
-                    print(f">>> New {self.opt_metrics['bootstrap']} score for {dset_name}: {best[dset_name][self.opt_metrics['bootstrap']]}")
+            if self.opt_metrics['bootstrap'] == 'iou':
+                # At least two better heads and a better total
+                    # iou mostly around 0 but sometime up to 7/8
+                if (nbetterheads > 1) and sum(opt_metrics) > sum([best[dset_name][self.opt_metrics['bootstrap']] for dset_name in self.dsets_names]):
+                    print(f">> New best model")
+                    best = current
+                    for dset_name in self.dsets_names:
+                        print(f">>> New {self.opt_metrics['bootstrap']} score for {dset_name}: {best[dset_name][self.opt_metrics['bootstrap']]}")
+            else:
+                # At least two better heads and max difference of 0.2 -> better model
+                if (nbetterheads > 1) and ((max(opt_metrics) - min(opt_metrics)) < 0.2):
+                    print(f">> New best model")
+                    best = current
+                    for dset_name in self.dsets_names:
+                        print(f">>> New {self.opt_metrics['bootstrap']} score for {dset_name}: {best[dset_name][self.opt_metrics['bootstrap']]}")
 
         torch.save(best['model'].to_state_dict(), self.paths['bootstrap_model'])
 
