@@ -27,6 +27,12 @@ class SegmentationDatasetFolder(torchvision.datasets.DatasetFolder):
         img_path, img_mask_path = self.data[idx]
         img = self.loader(img_path, self.img_dim)#[:self.img_dim[0], :self.img_dim[1]]
         img_mask = self.loader(img_mask_path, self.img_dim)#[:self.img_dim[0], :self.img_dim[1]]
+        # Ensure the sizes are correct
+        # ary = np.pad(ary, [(0, dim[0]), (0, dim[1])])[:dim[0], :dim[1]]
+        if self.img_dim is not None:
+            # Second argument in torch padding requires the size to add "before last dimension", "after last dimension", "before second-to-last dimension", ...
+            img = torch.nn.functional.pad(img, (0, self.img_dim[1], 0, self.img_dim[0]), 'constant', 0)[:, :self.img_dim[0], :self.img_dim[1]]
+            img_mask = torch.nn.functional.pad(img_mask, (0, self.img_dim[1], 0, self.img_dim[0]), 'constant', 0)[:, :self.img_dim[0], :self.img_dim[1]]
 
         return img, img_mask
 
@@ -38,7 +44,8 @@ class LoopLoader():
             which, # '['train', 'test', 'val']'
             batch_size,
             cuda_device,
-            training_task='classification'
+            training_task='classification',
+            img_dim=(256,256)
         ):
 
         self.dset_path = dset_path
@@ -46,6 +53,7 @@ class LoopLoader():
         self.batch_size = batch_size
         self.cuda_device = cuda_device
         self.training_task = training_task
+        self.img_dim = img_dim
 
         if self.training_task == 'classification':
             # For a list of which, we concatenate
@@ -58,7 +66,8 @@ class LoopLoader():
             self.ds_folder = torch.utils.data.ConcatDataset([SegmentationDatasetFolder(
                 path=f"{dset_path}/{split}/",
                 cuda_device=self.cuda_device,
-                loader=segmentation_loader(self.cuda_device))
+                loader=segmentation_loader(self.cuda_device),
+                img_dim=self.img_dim)
                 for split in which])
         else:
             # Todo trow errow and say that task is not valid but shoul be in ['classification', 'segmentation']
@@ -103,13 +112,11 @@ def segmentation_loader(cuda_device):
         # if len(ary.shape) == 3:
         #     ary = ary.transpose(1, 2, 0).dot([0.299, 0.587, 0.114])
             # print('image converted to 1 channel')
-        # Ensure the size is correct
-        ary = np.pad(ary, [(0, dim[0]), (0, dim[1])])[:dim[0], :dim[1]]
-        # if mask: ary.shape = (1, *ary.shape)
+        # Add color channel
         ary.shape = (1, *ary.shape)
         # Send the tensor to the GPU/CPU depending on what device is available
         tensor = torch.from_numpy(ary).float().to(cuda_device)
-        return tensor#.float()
+        return tensor
     return the_loader
 
 
@@ -177,7 +184,7 @@ def get_metrics(loss_function, confusion_matrix_dict, predictions_per_batch):
         'f1score': f1score, 'specificity': specificity, 'auc': auc}
 
 
-def get_segmentation_metrics(losses, confusion_matrix_dict):
+def get_segmentation_metrics(losses, aucs, confusion_matrix_dict):
     # Get totals
     tp = sum(confusion_matrix_dict['TP'])
     fp = sum(confusion_matrix_dict['FP'])
@@ -217,10 +224,13 @@ def get_segmentation_metrics(losses, confusion_matrix_dict):
     # Receive directly the per-batch losses and average them
     loss = np.mean(losses)
 
+    # Receive the per-batch auc and average them
+    auc = np.mean(aucs)
+
     return {
         'loss': loss, 'accuracy': accuracy,
         'precision': precision, 'recall': recall,
-        'f1score': f1score, 'specificity': specificity, 'auc': 0, 'iou': iou}
+        'f1score': f1score, 'specificity': specificity, 'auc': auc, 'iou': iou}
 
 
 
@@ -242,7 +252,7 @@ def compute_per_channel_dice(input, target, epsilon=1e-6, weight=None):
     """
 
     # input and target shapes must match
-    assert input.size() == target.size(), "'input' and 'target' must have the same shape"
+    assert input.size() == target.size(), f"'input' and 'target' must have the same shape, got {input.size()} and {target.size()}"
 
     input = input.flatten()
     target = target.flatten()

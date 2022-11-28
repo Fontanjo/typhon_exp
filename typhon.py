@@ -29,7 +29,8 @@ class Typhon(object):
             training_task,
             batch_size,
             cuda_device,
-            resume
+            resume,
+            img_dims
         ):
 
         self.paths = paths
@@ -52,6 +53,7 @@ class Typhon(object):
         self.metrics_plot = pd.DataFrame(columns=['type', 'feature_extractor', 'epoch', 'dataset', 'split', 'metric', 'value'])
         self.best_models = {}
         self.nb_dataset = len(self.paths['dsets'])
+        self.img_dims = img_dims
         # assert self.nb_dataset == 3, 'Double check as long as we work with 3'
 
 
@@ -143,9 +145,12 @@ class Typhon(object):
         # List of losses
         losses = []
 
-        start = time.perf_counter()
+        # List of auc
+        aucs = []
 
         confusion_matrix_dict = {}
+
+        start = time.perf_counter()
 
         # For each batch
         for inputs, labels in test_data_loader:
@@ -172,11 +177,15 @@ class Typhon(object):
             raw_predictions = torch.cat((raw_predictions, outputs), 0)
             labels_tensor = torch.cat((labels_tensor, labels), 0)
 
+            # Compute loss
             ls = self.loss_functions[dset_name](raw_predictions, labels_tensor).item()
-            # print(outputs.unsqueeze(0).shape)
-            # print(ls.shape)
-            # losses = torch.cat((losses, ls), 0)
             losses.append(ls)
+
+            # Compute auc
+            labels_list = labels.flatten().cpu().numpy().tolist()
+            positive_pred_list = outputs.flatten().cpu().numpy().tolist()
+            auc = sklearn.metrics.roc_auc_score(labels_list, positive_pred_list).item()
+            aucs.append(auc)
 
             # Set the values of the output to 0 or 1 (tumor at pixel xy or not) and cast to int
             predicted = (outputs > 0.5).int()
@@ -197,7 +206,7 @@ class Typhon(object):
 
 
 
-        metrics_test = utils.get_segmentation_metrics(losses, confusion_matrix_dict)
+        metrics_test = utils.get_segmentation_metrics(losses, aucs, confusion_matrix_dict)
         # metrics_test = utils.get_segmentation_metrics(self.loss_functions[dset_name], predictions_per_batch, confusion_matrix_dict)
 
         if verbose:
@@ -274,7 +283,8 @@ class Typhon(object):
                     which=['train', 'val'],
                     batch_size=self.batch_size['train'],
                     cuda_device=self.cuda_device,
-                    training_task=self.training_task)
+                    training_task=self.training_task,
+                    img_dim=self.img_dims[dset_name])
 
                 self.bootstrap_data_loaders[dset_name] = bootstrap_loop_loader.data_loader
                 print(f">> Data loaded for dataset {self.paths['dsets'][dset_name]}")
@@ -292,21 +302,24 @@ class Typhon(object):
                     which=['train'],
                     batch_size=self.batch_size[type],
                     cuda_device=self.cuda_device,
-                    training_task=self.training_task)
+                    training_task=self.training_task,
+                    img_dim=self.img_dims[dset_name])
 
                 validation_loop_loader = utils.LoopLoader(
                     dset_path=self.paths['dsets'][dset_name],
                     which=['val'],
                     batch_size=self.batch_size[type],
                     cuda_device=self.cuda_device,
-                    training_task=self.training_task)
+                    training_task=self.training_task,
+                    img_dim=self.img_dims[dset_name])
 
                 test_loop_loader = utils.LoopLoader(
                     dset_path=self.paths['dsets'][dset_name],
                     which=['test'],
                     batch_size=1,
                     cuda_device=self.cuda_device,
-                    training_task=self.training_task)
+                    training_task=self.training_task,
+                    img_dim=self.img_dims[dset_name])
 
                 self.train_loop_loaders[dset_name] = train_loop_loader
                 self.train_data_loaders[dset_name] = train_loop_loader.data_loader
