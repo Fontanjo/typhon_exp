@@ -14,6 +14,10 @@ tensorboard = "*"
 torchvision = "*"
 torchsummary = "*"
 brutelogger = "*"
+opencv-python = "*"
+nibabel = "*"
+tqdm = "*"
+pydicom = "*"
 
 [dev-packages]
 
