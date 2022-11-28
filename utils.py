@@ -56,13 +56,14 @@ class LoopLoader():
                 for split in which])
         elif self.training_task == 'segmentation':
             self.ds_folder = torch.utils.data.ConcatDataset([SegmentationDatasetFolder(
-            path=f"{dset_path}/{split}/",
-            cuda_device='cpu',
-            loader=segmentation_loader(self.cuda_device))
-            for split in which])
+                path=f"{dset_path}/{split}/",
+                cuda_device=self.cuda_device,
+                loader=segmentation_loader(self.cuda_device))
+                for split in which])
         else:
             # Todo trow errow and say that task is not valid but shoul be in ['classification', 'segmentation']
-            pass
+            raise Error
+
 
         self.data_loader = torch.utils.data.DataLoader(
             dataset=self.ds_folder,
@@ -99,8 +100,8 @@ def segmentation_loader(cuda_device):
         # Load data
         ary = np.load(path)
         # Convert to 1-channel if necessary
-        if len(ary.shape) == 3:
-            ary = ary.transpose(1, 2, 0).dot([0.299, 0.587, 0.114])
+        # if len(ary.shape) == 3:
+        #     ary = ary.transpose(1, 2, 0).dot([0.299, 0.587, 0.114])
             # print('image converted to 1 channel')
         # Ensure the size is correct
         ary = np.pad(ary, [(0, dim[0]), (0, dim[1])])[:dim[0], :dim[1]]
@@ -176,7 +177,7 @@ def get_metrics(loss_function, confusion_matrix_dict, predictions_per_batch):
         'f1score': f1score, 'specificity': specificity, 'auc': auc}
 
 
-def get_segmentation_metrics(loss_function, predictions_per_batch, confusion_matrix_dict):
+def get_segmentation_metrics(losses, confusion_matrix_dict):
     # Get totals
     tp = sum(confusion_matrix_dict['TP'])
     fp = sum(confusion_matrix_dict['FP'])
@@ -213,9 +214,8 @@ def get_segmentation_metrics(loss_function, predictions_per_batch, confusion_mat
     else:
         iou = 0.0
 
-    pred = predictions_per_batch['raw_predictions']
-    label = predictions_per_batch['labels_tensor']
-    loss = loss_function(pred, label).item()
+    # Receive directly the per-batch losses and average them
+    loss = np.mean(losses)
 
     return {
         'loss': loss, 'accuracy': accuracy,
@@ -244,9 +244,7 @@ def compute_per_channel_dice(input, target, epsilon=1e-6, weight=None):
     # input and target shapes must match
     assert input.size() == target.size(), "'input' and 'target' must have the same shape"
 
-    # input = flatten(input)
     input = input.flatten()
-    # target = flatten(target)
     target = target.flatten()
     target = target.float()
 

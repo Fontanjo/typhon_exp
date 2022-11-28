@@ -138,7 +138,10 @@ class Typhon(object):
         model.to(self.cuda_device)
 
         # List of predictions)
-        predictions_per_batch = {'labels': [], 'predictions_positive_class': [], 'raw_predictions': torch.tensor([]).to(self.cuda_device), 'labels_tensor': torch.tensor([]).to(self.cuda_device)}
+        # predictions_per_batch = {'labels': [], 'predictions_positive_class': [], 'raw_predictions': torch.tensor([]).to(self.cuda_device), 'labels_tensor': torch.tensor([]).to(self.cuda_device)}
+
+        # List of losses
+        losses = []
 
         start = time.perf_counter()
 
@@ -146,14 +149,34 @@ class Typhon(object):
 
         # For each batch
         for inputs, labels in test_data_loader:
+            # Reinitialize
+            raw_predictions = torch.tensor([]).to(self.cuda_device)
+            labels_tensor = torch.tensor([]).to(self.cuda_device)
+
             # Send data to GPU if available
             inputs, labels = inputs.to(self.cuda_device), labels.to(self.cuda_device)
             # Feed the model and get outputs
             # Raw, unnormalized output required to compute the loss (with CrossEntropyLoss)
             outputs = model(inputs, dset_name)
 
-            predictions_per_batch['raw_predictions'] = torch.cat((predictions_per_batch['raw_predictions'], outputs), 0)
-            predictions_per_batch['labels_tensor'] = torch.cat((predictions_per_batch['labels_tensor'].long(), labels), 0)
+
+            #####################################################
+            # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! #
+            # Storing all this is what causes the CUDA problem! #
+            # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! #
+            #####################################################
+            # predictions_per_batch['raw_predictions'] = torch.cat((predictions_per_batch['raw_predictions'], outputs), 0)
+            # predictions_per_batch['labels_tensor'] = torch.cat((predictions_per_batch['labels_tensor'].long(), labels), 0)
+            # Instead, compute directly the loss (add a group dimension as if there where multiple batches)
+
+            raw_predictions = torch.cat((raw_predictions, outputs), 0)
+            labels_tensor = torch.cat((labels_tensor, labels), 0)
+
+            ls = self.loss_functions[dset_name](raw_predictions, labels_tensor).item()
+            # print(outputs.unsqueeze(0).shape)
+            # print(ls.shape)
+            # losses = torch.cat((losses, ls), 0)
+            losses.append(ls)
 
             # Set the values of the output to 0 or 1 (tumor at pixel xy or not) and cast to int
             predicted = (outputs > 0.5).int()
@@ -174,7 +197,8 @@ class Typhon(object):
 
 
 
-        metrics_test = utils.get_segmentation_metrics(self.loss_functions[dset_name], predictions_per_batch, confusion_matrix_dict)
+        metrics_test = utils.get_segmentation_metrics(losses, confusion_matrix_dict)
+        # metrics_test = utils.get_segmentation_metrics(self.loss_functions[dset_name], predictions_per_batch, confusion_matrix_dict)
 
         if verbose:
             summary_text = f"""
