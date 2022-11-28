@@ -56,6 +56,16 @@ class Experiment:
         self.optimizers = {name:optim for name, optim in zip(self.cfg['dsets'], self.cfg['optimizers'])}
         self.loss_functions = {name:fct for name, fct in zip(self.cfg['dsets'], self.cfg['loss_functions'])}
 
+        # Give an image size for each dset
+        # If not specified, pass None to avoid resizing
+        if self.cfg.get('working_sizes', None) is None:
+            self.cfg['working_sizes'] = [None for _ in range(len(self.cfg['dsets']))]
+        # If only 1 value is specified, consider it to be for each dset
+        if len(self.cfg['working_sizes']) == 1 and len(self.cfg['dsets']) > 1:
+            self.cfg['working_sized'] = [self.cfg['working_sizes'][0] for _ in range(len(self.cfg['dsets']))]
+        # Convert to dict with dset name as key
+        self.img_dims = {name:sizes for name, sizes in zip(self.cfg['dsets'], self.cfg['working_sizes'])}
+
         self.train_args = {
             'paths' : self.paths,
             'dsets_names' : self.cfg['dsets'],
@@ -74,6 +84,7 @@ class Experiment:
             'training_task': self.cfg['training_task'],
             'cuda_device' : self.cuda_device,
             'resume' : self.cfg['resume'],
+            'img_dims' : self.img_dims
         }
 
         print(f"> Config loaded successfully for {self.cfg['transfer']} training:")
