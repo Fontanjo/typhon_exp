@@ -1,49 +1,251 @@
-# https://medium.com/analytics-vidhya/unet-implementation-in-pytorch-idiot-developer-da40d955f201
-# Slightly modified to always output 1 value for encoder blocks and take 1 input value for deconder blocks
-
 import torch
 import torch.nn as nn
-from architectures.unet_blocks import conv_block, encoder_block, decoder_block
 
-def get_block(dropout, in_chanels=1):
-    return Unet_container(in_chanels=in_chanels)
+def get_block(dropout, in_channels=1):
+    return Unet_container(in_channels=in_channels)
 
 
 class Unet_container(nn.Module):
-    def __init__(self, in_chanels):
+    def __init__(self, in_channels):
         super().__init__()
-        """ Encoder """
-        self.e1 = encoder_block(in_chanels, 64)
-        self.e2 = encoder_block(64, 128)
-        self.e3 = encoder_block(128, 256)
-        self.e4 = encoder_block(256, 512)
 
-        """ Bottleneck """
-        self.b = conv_block(512, 1024)
+        """ Descending ('encoder') part """
+        """ Block 1 """
+        self.conv_e_1_1 =   nn.Conv2d(in_channels, 64, kernel_size=3, padding=1)
+        self.bn_e_1_1 =     nn.BatchNorm2d(64)
+        self.relu_e_1_1 =   nn.ReLU()
 
-        """ Decoder """
-        self.d1 = decoder_block(1024, 512)
-        self.d2 = decoder_block(512, 256)
-        self.d3 = decoder_block(256, 128)
+        self.conv_e_1_2 =   nn.Conv2d(64, 64, kernel_size=3, padding=1)
+        self.bn_e_1_2 =     nn.BatchNorm2d(64)
+        self.relu_e_1_2 =   nn.ReLU()
+
+        self.pool_e_1 =     nn.MaxPool2d((2, 2))
+
+        """ Block 2 """
+        self.conv_e_2_1 =   nn.Conv2d(64, 128, kernel_size=3, padding=1)
+        self.bn_e_2_1 =     nn.BatchNorm2d(128)
+        self.relu_e_2_1 =   nn.ReLU()
+
+        self.conv_e_2_2 =   nn.Conv2d(128, 128, kernel_size=3, padding=1)
+        self.bn_e_2_2 =     nn.BatchNorm2d(128)
+        self.relu_e_2_2 =   nn.ReLU()
+
+        self.pool_e_2 =     nn.MaxPool2d((2, 2))
+
+        """ Block 3 """
+        self.conv_e_3_1 =   nn.Conv2d(128, 256, kernel_size=3, padding=1)
+        self.bn_e_3_1 =     nn.BatchNorm2d(256)
+        self.relu_e_3_1 =   nn.ReLU()
+
+        self.conv_e_3_2 =   nn.Conv2d(256, 256, kernel_size=3, padding=1)
+        self.bn_e_3_2 =     nn.BatchNorm2d(256)
+        self.relu_e_3_2 =   nn.ReLU()
+
+        self.pool_e_3 =     nn.MaxPool2d((2, 2))
+
+
+        """ Block 4 """
+        self.conv_e_4_1 =   nn.Conv2d(256, 512, kernel_size=3, padding=1)
+        self.bn_e_4_1 =     nn.BatchNorm2d(512)
+        self.relu_e_4_1 =   nn.ReLU()
+
+        self.conv_e_4_2 =   nn.Conv2d(512, 512, kernel_size=3, padding=1)
+        self.bn_e_4_2 =     nn.BatchNorm2d(512)
+        self.relu_e_4_2 =   nn.ReLU()
+
+        self.pool_e_4 =     nn.MaxPool2d((2, 2))
+
+
+        """ Central ('bottleneck') part """
+        self.conv_b_1 =     nn.Conv2d(512, 1024, kernel_size=3, padding=1)
+        self.bn_b_1 =       nn.BatchNorm2d(1024)
+        self.relu_b_1 =     nn.ReLU()
+
+        self.conv_b_2 =     nn.Conv2d(1024, 1024, kernel_size=3, padding=1)
+        self.bn_b_2 =       nn.BatchNorm2d(1024)
+        self.relu_b_2 =     nn.ReLU()
+
+
+        """ Ascending ('decoder') part """
+        """ Block 1 """
+        self.upconv_1 =     nn.ConvTranspose2d(1024, 512, kernel_size=2, stride=2, padding=0)
+
+        self.conv_d_1_1 =   nn.Conv2d(512 + 512, 512, kernel_size=3, padding=1)
+        self.bn_d_1_1 =     nn.BatchNorm2d(512)
+        self.relu_d_1_1 =   nn.ReLU()
+
+        self.conv_d_1_2 =   nn.Conv2d(512, 512, kernel_size=3, padding=1)
+        self.bn_d_1_2 =     nn.BatchNorm2d(512)
+        self.relu_d_1_2 =   nn.ReLU()
+
+
+        """ Block 2 """
+        self.upconv_2 =     nn.ConvTranspose2d(512, 256, kernel_size=2, stride=2, padding=0)
+
+        self.conv_d_2_1 =   nn.Conv2d(256 + 256, 256, kernel_size=3, padding=1)
+        self.bn_d_2_1 =     nn.BatchNorm2d(256)
+        self.relu_d_2_1 =   nn.ReLU()
+
+        self.conv_d_2_2 =   nn.Conv2d(256, 256, kernel_size=3, padding=1)
+        self.bn_d_2_2 =     nn.BatchNorm2d(256)
+        self.relu_d_2_2 =   nn.ReLU()
+
+
 
 
     def forward(self, inputs):
-        inputs = inputs[:,:,:256,:256] # Reshape, since in deconding phase will be a power of 2 and must be equal
-        """ Encoder """
-        s1, p1 = self.e1(inputs)
-        s2, p2 = self.e2(p1)
-        s3, p3 = self.e3(p2)
-        s4, p4 = self.e4(p3)
+        """ Descending ('encoder') part """
+        """ Block 1 """
+        x = self.conv_e_1_1(inputs)
+        x = self.bn_e_1_1(x)
+        x = self.relu_e_1_1(x)
 
-        """ Bottleneck """
-        b = self.b(p4)
+        x = self.conv_e_1_2(x)
+        x = self.bn_e_1_2(x)
+        x = self.relu_e_1_2(x)
 
-        """ Decoder """
-        d1 = self.d1([b, s4])
-        d2 = self.d2([d1, s3])
-        d3 = self.d3([d2, s2])
+        s1 = x # Store first skip
 
-        return [d3, s1]
+        x = self.pool_e_1(x)
+
+
+        """ Block 2 """
+        x = self.conv_e_2_1(x)
+        x = self.bn_e_2_1(x)
+        x = self.relu_e_2_1(x)
+
+        x = self.conv_e_2_2(x)
+        x = self.bn_e_2_2(x)
+        x = self.relu_e_2_2(x)
+
+        s2 = x # Store second skip
+
+        x = self.pool_e_2(x)
+
+
+        """ Block 3 """
+        x = self.conv_e_3_1(x)
+        x = self.bn_e_3_1(x)
+        x = self.relu_e_3_1(x)
+
+        x = self.conv_e_3_2(x)
+        x = self.bn_e_3_2(x)
+        x = self.relu_e_3_2(x)
+
+        s3 = x # Store third skip
+
+        x = self.pool_e_3(x)
+
+
+        """ Block 4 """
+        x = self.conv_e_4_1(x)
+        x = self.bn_e_4_1(x)
+        x = self.relu_e_4_1(x)
+
+        x = self.conv_e_4_2(x)
+        x = self.bn_e_4_2(x)
+        x = self.relu_e_4_2(x)
+
+        s4 = x # Store fourth skip
+
+        x = self.pool_e_4(x)
+
+
+        """ Central ('bottleneck') part """
+        x = self.conv_b_1(x)
+        x = self.bn_b_1(x)
+        x = self.relu_b_1(x)
+
+        x = self.conv_b_2(x)
+        x = self.bn_b_2(x)
+        x = self.relu_b_2(x)
+
+
+        """ Ascending ('decoder') part """
+        """ Block 1 """
+        x = self.upconv_1(x)
+
+        x = torch.cat([x, s4], axis=1)
+
+        x = self.conv_d_1_1(x)
+        x = self.bn_d_1_1(x)
+        x = self.relu_d_1_1(x)
+
+        x = self.conv_d_1_2(x)
+        x = self.bn_d_1_2(x)
+        x = self.relu_d_1_2(x)
+
+
+        """ Block 2 """
+        x = self.upconv_2(x)
+
+        x = torch.cat([x, s3], axis=1)
+
+        x = self.conv_d_2_1(x)
+        x = self.bn_d_2_1(x)
+        x = self.relu_d_2_1(x)
+
+        x = self.conv_d_2_2(x)
+        x = self.bn_d_2_2(x)
+        x = self.relu_d_2_2(x)
+
+        return [x, s2, s1]
+
 
     def __iter__(self):
-        return iter([self.e1, self.e2, self.e3, self.e4, self.b, self.d3, self.d2, self.d1])
+        return iter([
+            self.conv_e_1_1,
+            self.bn_e_1_1,
+            self.relu_e_1_1,
+            self.conv_e_1_2,
+            self.bn_e_1_2,
+            self.relu_e_1_2,
+            self.pool_e_1,
+
+            self.conv_e_2_1,
+            self.bn_e_2_1,
+            self.relu_e_2_1,
+            self.conv_e_2_2,
+            self.bn_e_2_2,
+            self.relu_e_2_2,
+            self.pool_e_2,
+
+            self.conv_e_3_1,
+            self.bn_e_3_1,
+            self.relu_e_3_1,
+            self.conv_e_3_2,
+            self.bn_e_3_2,
+            self.relu_e_3_2,
+            self.pool_e_3,
+
+            self.conv_e_4_1,
+            self.bn_e_4_1,
+            self.relu_e_4_1,
+            self.conv_e_4_2,
+            self.bn_e_4_2,
+            self.relu_e_4_2,
+            self.pool_e_4,
+
+            self.conv_b_1,
+            self.bn_b_1,
+            self.relu_b_1,
+            self.conv_b_2,
+            self.bn_b_2,
+            self.relu_b_2,
+
+            self.upconv_1,
+            self.conv_d_1_1,
+            self.bn_d_1_1,
+            self.relu_d_1_1,
+            self.conv_d_1_2,
+            self.bn_d_1_2,
+            self.relu_d_1_2,
+
+            self.upconv_2,
+            self.conv_d_2_1,
+            self.bn_d_2_1,
+            self.relu_d_2_1,
+            self.conv_d_2_2,
+            self.bn_d_2_2,
+            self.relu_d_2_2,
+        ])

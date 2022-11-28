@@ -2,19 +2,20 @@ vgg16 -> https://iq.opengenus.org/vgg16/
   split before the last 3 linear layers
 
 unet -> https://medium.com/analytics-vidhya/unet-implementation-in-pytorch-idiot-developer-da40d955f201
-  v1 -> split after the entire recostruction, only one convolution in dm
-  v2 -> split before the last block of reconstruction
-  v3 -> split before last 2 blocks of reconstruction
-  v4 -> split before last 3 blocks of reconstruction
+  v0 -> split after the entire recostruction, only one convolution in dm
+  v1 -> split before last 1 block of reconstruction
+  v2 -> split before last 2 blocks of reconstruction
+  v3 -> split before last 3 blocks of reconstruction
 
 
-                                                         v2       v1
-                                                  v3     |        |
-                                           v4     |      |        |
+                                                         v1       v0
+                                                  v2     |        |
+                                           v3     |      |        |
   input ---> cnn --------------------------|------|------|- tcnn -|--> output
                   cnn ---------------------|------|- tcnn
                        cnn ----------------|- tcnn
                             cnn ----- tcnn
+                                  cnn
 
 
   cnn = encoder block, based on Conv2d

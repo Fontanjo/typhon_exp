@@ -1,8 +1,56 @@
+import torch
 import torch.nn as nn
 
-def get_block(dropout, num_classes=2):
-    return nn.Sequential(
-        nn.Conv2d(64, 1, kernel_size=1, padding=0), # Original unet
+def get_block(dropout, in_channels=1):
+    return Unet_container(in_channels=in_channels)
 
-        nn.Sigmoid()  # Not (or yes?) in the original model. Added since loss requires values in [0, 1]
-    )
+
+class Unet_container(nn.Module):
+    def __init__(self, in_channels):
+        super().__init__()
+        
+        """ Ascending ('decoder') part """
+        """ Block 4 """
+        self.upconv_4 =     nn.ConvTranspose2d(128, 64, kernel_size=2, stride=2, padding=0)
+
+        self.conv_d_4_1 =   nn.Conv2d(64 + 64, 64, kernel_size=3, padding=1)
+        self.bn_d_4_1 =     nn.BatchNorm2d(64)
+        self.relu_d_4_1 =   nn.ReLU()
+
+        self.conv_d_4_2 =   nn.Conv2d(64, 64, kernel_size=3, padding=1)
+        self.bn_d_4_2 =     nn.BatchNorm2d(64)
+        self.relu_d_4_2 =   nn.ReLU()
+
+
+
+
+    def forward(self, inputs):
+        # Extract values
+        x, s1 = inputs
+
+        """ Block 4 """
+        x = self.upconv_4(x)
+
+        x = torch.cat([x, s1], axis=1)
+
+        x = self.conv_d_4_1(x)
+        x = self.bn_d_4_1(x)
+        x = self.relu_d_4_1(x)
+
+        x = self.conv_d_4_2(x)
+        x = self.bn_d_4_2(x)
+        x = self.relu_d_4_2(x)
+
+        return x
+
+
+    def __iter__(self):
+        return iter([
+            self.upconv_4,
+            self.conv_d_4_1,
+            self.bn_d_4_1,
+            self.relu_d_4_1,
+            self.conv_d_4_2,
+            self.bn_d_4_2,
+            self.relu_d_4_2
+        ])
