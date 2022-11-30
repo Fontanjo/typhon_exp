@@ -47,7 +47,7 @@ class Unet_container(nn.Module):
 
 
         """ Final part """
-        self.conv_f =       nn.Conv2d(64, 1, kernel_size=1, padding=0),
+        self.conv_f =       nn.Conv2d(64, 1, kernel_size=1, padding=0)
         self.sigmoid =      nn.Sigmoid()
 
 
