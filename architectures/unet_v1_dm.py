@@ -8,7 +8,7 @@ def get_block(dropout, in_channels=1):
 class Unet_container(nn.Module):
     def __init__(self, in_channels):
         super().__init__()
-        
+
         """ Ascending ('decoder') part """
         """ Block 4 """
         self.upconv_4 =     nn.ConvTranspose2d(128, 64, kernel_size=2, stride=2, padding=0)
@@ -20,6 +20,11 @@ class Unet_container(nn.Module):
         self.conv_d_4_2 =   nn.Conv2d(64, 64, kernel_size=3, padding=1)
         self.bn_d_4_2 =     nn.BatchNorm2d(64)
         self.relu_d_4_2 =   nn.ReLU()
+
+
+        """ Final part """
+        self.conv_f =       nn.Conv2d(64, 1, kernel_size=1, padding=0),
+        self.sigmoid =      nn.Sigmoid()
 
 
 
@@ -41,6 +46,10 @@ class Unet_container(nn.Module):
         x = self.bn_d_4_2(x)
         x = self.relu_d_4_2(x)
 
+        """ Final part """
+        x = self.conv_f(x)
+        x = self.sigmoid(x)
+
         return x
 
 
@@ -52,5 +61,8 @@ class Unet_container(nn.Module):
             self.relu_d_4_1,
             self.conv_d_4_2,
             self.bn_d_4_2,
-            self.relu_d_4_2
+            self.relu_d_4_2,
+
+            self.conv_f,
+            self.sigmoid
         ])

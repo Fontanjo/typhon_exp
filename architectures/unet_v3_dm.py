@@ -46,6 +46,11 @@ class Unet_container(nn.Module):
         self.relu_d_4_2 =   nn.ReLU()
 
 
+        """ Final part """
+        self.conv_f =       nn.Conv2d(64, 1, kernel_size=1, padding=0),
+        self.sigmoid =      nn.Sigmoid()
+
+
 
 
     def forward(self, inputs):
@@ -94,6 +99,11 @@ class Unet_container(nn.Module):
         x = self.bn_d_4_2(x)
         x = self.relu_d_4_2(x)
 
+
+        """ Final part """
+        x = self.conv_f(x)
+        x = self.sigmoid(x)
+
         return x
 
 
@@ -121,5 +131,8 @@ class Unet_container(nn.Module):
             self.relu_d_4_1,
             self.conv_d_4_2,
             self.bn_d_4_2,
-            self.relu_d_4_2
+            self.relu_d_4_2,
+
+            self.conv_f,
+            self.sigmoid
         ])
