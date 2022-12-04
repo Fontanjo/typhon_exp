@@ -62,7 +62,7 @@ class Experiment:
             self.cfg['working_sizes'] = [None for _ in range(len(self.cfg['dsets']))]
         # If only 1 value is specified, consider it to be for each dset
         if len(self.cfg['working_sizes']) == 1 and len(self.cfg['dsets']) > 1:
-            self.cfg['working_sized'] = [self.cfg['working_sizes'][0] for _ in range(len(self.cfg['dsets']))]
+            self.cfg['working_sizes'] = [self.cfg['working_sizes'][0] for _ in range(len(self.cfg['dsets']))]
         # Convert to dict with dset name as key
         self.img_dims = {name:sizes for name, sizes in zip(self.cfg['dsets'], self.cfg['working_sizes'])}
 
