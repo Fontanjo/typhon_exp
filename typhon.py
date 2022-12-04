@@ -61,6 +61,8 @@ class Typhon(object):
     def test_model(self, model, dset_name, test_data_loader, verbose=False):
         if self.training_task == 'segmentation':
             return self.test_segmentation_model(model, dset_name, test_data_loader, verbose)
+        if self.training_task == 'autoencoding':
+            return self.test_autoencoding_model(model, dset_name, test_data_loader, verbose)
         # This only sets the model to "eval mode" (and disables specific
         # layers such as dropout and batchnorm). Opposite: `model.train()`
         model.eval()
@@ -88,7 +90,7 @@ class Typhon(object):
             # Probabilities required to compute roc_auc_score, so use a softmax
             softmax = torch.nn.Softmax(dim=1)
             proba_classes = softmax(outputs)
-            all_positives = torch.index_select(proba_classes, 1, torch.tensor([1]).to(self.cuda_device))
+            all_positives = torch.index_select(outputs, 1, torch.tensor([1]).to(self.cuda_device))
 
             predictions_per_batch['labels'] = predictions_per_batch['labels'] + labels.cpu().numpy().tolist()
             predictions_per_batch['predictions_positive_class'] = predictions_per_batch['predictions_positive_class'] + all_positives.cpu().numpy().flatten().tolist()
@@ -174,6 +176,8 @@ class Typhon(object):
             # predictions_per_batch['labels_tensor'] = torch.cat((predictions_per_batch['labels_tensor'].long(), labels), 0)
             # Instead, compute directly the loss (add a group dimension as if there where multiple batches)
 
+
+            # TODO: improve, useless to create empty tensor and then concatenate only 1 argument
             raw_predictions = torch.cat((raw_predictions, outputs), 0)
             labels_tensor = torch.cat((labels_tensor, labels), 0)
 
@@ -184,7 +188,13 @@ class Typhon(object):
             # Compute auc
             labels_list = labels.flatten().cpu().numpy().tolist()
             positive_pred_list = outputs.flatten().cpu().numpy().tolist()
-            auc = sklearn.metrics.roc_auc_score(labels_list, positive_pred_list).item()
+            try:
+                auc = sklearn.metrics.roc_auc_score(labels_list, positive_pred_list).item()
+                # print(f'AUC = {auc}')
+            except ValueError:
+                # print('Only one class present in y_true. ROC AUC score is not defined in that case.')
+                # print('Saving AUC as 0')
+                auc = 0
             aucs.append(auc)
 
             # Set the values of the output to 0 or 1 (tumor at pixel xy or not) and cast to int
@@ -230,6 +240,114 @@ class Typhon(object):
 
         return metrics_test
 
+
+    @torch.no_grad()
+    def test_autoencoding_model(self, model, dset_name, test_data_loader, verbose=False):
+        # This only sets the model to "eval mode" (and disables specific
+        # layers such as dropout and batchnorm). Opposite: `model.train()`
+        model.eval()
+        assert model.training == False, "Model not in eval mode"
+
+        # Send model to GPU if available
+        model.to(self.cuda_device)
+
+        # List of predictions)
+        # predictions_per_batch = {'labels': [], 'predictions_positive_class': [], 'raw_predictions': torch.tensor([]).to(self.cuda_device), 'labels_tensor': torch.tensor([]).to(self.cuda_device)}
+
+        # List of losses
+        losses = []
+
+        # List of auc
+        aucs = []
+
+        confusion_matrix_dict = {}
+
+        start = time.perf_counter()
+
+        # For each batch
+        for inputs, labels in test_data_loader:
+            # Reinitialize
+            raw_predictions = torch.tensor([]).to(self.cuda_device)
+            labels_tensor = torch.tensor([]).to(self.cuda_device)
+
+            # Send data to GPU if available
+            inputs, labels = inputs.to(self.cuda_device), labels.to(self.cuda_device)
+            # Feed the model and get outputs
+            # Raw, unnormalized output required to compute the loss (with CrossEntropyLoss)
+            outputs = model(inputs, dset_name)
+
+
+            #####################################################
+            # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! #
+            # Storing all this is what causes the CUDA problem! #
+            # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! #
+            #####################################################
+            # predictions_per_batch['raw_predictions'] = torch.cat((predictions_per_batch['raw_predictions'], outputs), 0)
+            # predictions_per_batch['labels_tensor'] = torch.cat((predictions_per_batch['labels_tensor'].long(), labels), 0)
+            # Instead, compute directly the loss (add a group dimension as if there where multiple batches)
+
+            # TODO: improve, useless to create empty tensor and then concatenate only 1 argument
+            raw_predictions = torch.cat((raw_predictions, outputs), 0)
+            labels_tensor = torch.cat((labels_tensor, labels), 0)
+
+            # Compute loss
+            ls = self.loss_functions[dset_name](raw_predictions, labels_tensor).item()
+            losses.append(ls)
+
+            # # Compute auc
+            # labels_list = labels.flatten().cpu().numpy().tolist()
+            # positive_pred_list = outputs.flatten().cpu().numpy().tolist()
+            # try:
+            #     auc = sklearn.metrics.roc_auc_score(labels_list, positive_pred_list).item()
+            #     # print(f'AUC = {auc}')
+            # except ValueError:
+            #     # print('Only one class present in y_true. ROC AUC score is not defined in that case.')
+            #     # print('Saving AUC as 0')
+            #     auc = 0
+            # aucs.append(auc)
+            #
+            # # Set the values of the output to 0 or 1 (tumor at pixel xy or not) and cast to int
+            # predicted = (outputs > 0.5).int()
+            # labels = labels.int()
+            #
+            # # TODO check efficiency and possibly find a better way
+            # tp = torch.sum((predicted==labels) * (predicted==1)).item()
+            # tn = torch.sum((predicted==labels) * (predicted==0)).item()
+            # fp = torch.sum((predicted!=labels) * (predicted==1)).item()
+            # fn = torch.sum((predicted!=labels) * (predicted==0)).item()
+            #
+            # conf_matrix_per_batch = {'TP': tp, 'FP': fp, 'TN': tn, 'FN': fn}
+            #
+            # for key, value in conf_matrix_per_batch.items():
+            #     confusion_matrix_dict.setdefault(key, []).append(value)
+
+        end = time.perf_counter()
+
+
+
+        metrics_test = utils.get_segmentation_metrics(losses, aucs, confusion_matrix_dict)
+        # metrics_test = utils.get_segmentation_metrics(self.loss_functions[dset_name], predictions_per_batch, confusion_matrix_dict)
+
+        if verbose:
+            summary_text = f"""
+            SUMMARY OF THE CLASSIFIER ON TEST SET :
+
+            -------------------
+            Loss: {metrics_test['loss']}
+            Accuracy: {metrics_test['accuracy']}
+            Precision:{metrics_test['precision']}
+            Recall:   {metrics_test['recall']}
+            F1 score: {metrics_test['f1score']}
+            Specificity: {metrics_test['specificity']}
+            IoU: {metrics_test['iou']}
+            --------------------
+            Running time: {end-start}
+
+            """
+
+            print(summary_text)
+
+        return metrics_test
 
     # Load the model from the given model, and set the optimizers
     # type is either 'train' or 'spec'

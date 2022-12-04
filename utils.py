@@ -8,7 +8,7 @@ import cv2
 
 
 class SegmentationDatasetFolder(torchvision.datasets.DatasetFolder):
-    def __init__(self, loader, path, cuda_device='cpu', img_dim=(256, 256)):
+    def __init__(self, loader, path, cuda_device='cpu', img_dim=None):
         self.loader = loader
         self.cuda_device = cuda_device
         self.imgs_path = path
@@ -36,6 +36,33 @@ class SegmentationDatasetFolder(torchvision.datasets.DatasetFolder):
 
         return img, img_mask
 
+
+class AutoencodingDatasetFolder(torchvision.datasets.DatasetFolder):
+    def __init__(self, loader, path, cuda_device='cpu', img_dim=None):
+        self.loader = loader
+        self.cuda_device = cuda_device
+        self.imgs_path = path
+        file_list = glob.glob(self.imgs_path + "*.npy") # All .npy files
+        self.data = []
+        for img in file_list:
+            self.data.append(img)
+        self.img_dim = img_dim
+        self.num_samples = len(self.data)
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        img_path = self.data[idx]
+        img = self.loader(img_path, self.img_dim)
+        img_mask = self.loader(img_mask_path, self.img_dim)
+        # Ensure the sizes are correct
+        if self.img_dim is not None:
+            # Second argument in torch padding requires the size to add "before last dimension", "after last dimension", "before second-to-last dimension", ...
+            img = torch.nn.functional.pad(img, (0, self.img_dim[1], 0, self.img_dim[0]), 'constant', 0)[:, :self.img_dim[0], :self.img_dim[1]]
+
+        # Return a copy as 'label'. Not optimal for memory, but preferred for readability
+        return img, img.detach().clone()
 
 
 class LoopLoader():
@@ -67,6 +94,13 @@ class LoopLoader():
                 path=f"{dset_path}/{split}/",
                 cuda_device=self.cuda_device,
                 loader=segmentation_loader(self.cuda_device),
+                img_dim=self.img_dim)
+                for split in which])
+        elif self.training_task == 'autoencoding':
+            self.ds_folder = torch.utils.data.ConcatDataset([AutoencodingDatasetFolder(
+                path=f"{dset_path}/{split}/",
+                cuda_device=self.cuda_device,
+                loader=autoencoding_loader(self.cuda_device),
                 img_dim=self.img_dim)
                 for split in which])
         else:
@@ -114,6 +148,16 @@ def segmentation_loader(cuda_device):
             # print('image converted to 1 channel')
         # Add color channel
         ary.shape = (1, *ary.shape)
+        # Send the tensor to the GPU/CPU depending on what device is available
+        tensor = torch.from_numpy(ary).float().to(cuda_device)
+        return tensor
+    return the_loader
+
+
+def autoencoding_loader(cuda_device):
+    def the_loader(path, dim=(256, 256)):
+        # Load data
+        ary = np.load(path)
         # Send the tensor to the GPU/CPU depending on what device is available
         tensor = torch.from_numpy(ary).float().to(cuda_device)
         return tensor
@@ -225,13 +269,75 @@ def get_segmentation_metrics(losses, aucs, confusion_matrix_dict):
     loss = np.mean(losses)
 
     # Receive the per-batch auc and average them
-    auc = np.mean(aucs)
+    #  In some cases, the auc can not be computed and is saved as 0 (when only 1 label)
+    #  Ignore this cases for the average
+    auc = np.mean([a for a in aucs if a is not 0])
 
     return {
         'loss': loss, 'accuracy': accuracy,
         'precision': precision, 'recall': recall,
         'f1score': f1score, 'specificity': specificity, 'auc': auc, 'iou': iou}
 
+
+
+def get_autoencoding_metrics(losses, aucs, confusion_matrix_dict):
+    # Get totals
+    # tp = sum(confusion_matrix_dict['TP'])
+    # fp = sum(confusion_matrix_dict['FP'])
+    # tn = sum(confusion_matrix_dict['TN'])
+    # fn = sum(confusion_matrix_dict['FN'])
+    #
+    # if tp + fp + tn + fn:
+    #     accuracy = (tp + tn) / (tp + fp + tn + fn)
+    # else:
+    #     accuracy = 0.0
+    #
+    # if tp + fp:
+    #     precision = tp / (tp + fp)
+    # else:
+    #     precision = 0.0
+    #
+    # if tp + fn:
+    #     recall = tp / (tp + fn)
+    # else:
+    #     recall = 0.0
+    #
+    # if precision + recall:
+    #     f1score = 2 * ((precision * recall) / (precision + recall))
+    # else:
+    #     f1score = 0.0
+    #
+    # if tn + fp:
+    #     specificity = tn / (tn + fp)
+    # else:
+    #     specificity = 0.0
+    #
+    # if tp + fp + fn:
+    #     iou = tp / (tp + fp + fn)
+    # else:
+    #     iou = 0.0
+
+    # Receive directly the per-batch losses and average them
+    loss = np.mean(losses)
+
+    # Receive the per-batch auc and average them
+    #  In some cases, the auc can not be computed and is saved as 0 (when only 1 label)
+    #  Ignore this cases for the average
+    # auc = np.mean([a for a in aucs if a is not 0])
+
+
+    accuracy = 0
+    precision = 0
+    recall = 0
+    f1score = 0
+    specificity = 0
+    auc = 0
+    iou = 0
+
+    return {
+        'loss': loss, 'accuracy': accuracy,
+        'precision': precision, 'recall': recall,
+        'f1score': f1score, 'specificity': specificity, 'auc': auc, 'iou': iou}
 
 
 #############################################
@@ -252,6 +358,7 @@ def compute_per_channel_dice(input, target, epsilon=1e-6, weight=None):
     """
 
     # input and target shapes must match
+    # print(f'{input.size()}, {target.size()}')
     assert input.size() == target.size(), f"'input' and 'target' must have the same shape, got {input.size()} and {target.size()}"
 
     input = input.flatten()
