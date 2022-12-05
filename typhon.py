@@ -534,7 +534,7 @@ class Typhon(object):
 
     # Save a sample of the current model
     def save_sample(self, model, dset_name, epoch):
-        data_loader = self.train_data_loaders[dset_name]
+        data_loader = self.test_data_loaders[dset_name]
         # Load 1 batch
         inputs, labels = next(iter(data_loader)) # Access only 1 batch
         # inputs, labels = data_loader.get_batch()
@@ -709,9 +709,10 @@ class Typhon(object):
                     print(f">>>> Aggregating metrics")
                     self.aggregate_metrics(metrics_training, 'train', dset_name, epoch, 'trained', feature_extractor)
                     self.aggregate_metrics(metrics_validation, 'validation', dset_name, epoch, 'trained', feature_extractor)
-                    print(f">>>> AUC train: {metrics_training['auc']}")
-                    print(f">>>> AUC val: {metrics_validation['auc']}")
-
+                    print(f">>> {self.opt_metrics['train']} train: {metrics_training[self.opt_metrics['train']]} ")
+                    print(f">>> {self.opt_metrics['train']} val: {metrics_validation[self.opt_metrics['train']]} ")
+                    # Save a sample
+                    self.save_sample(self.model, dset_name, epoch)
                     if (feature_extractor == 'unfrozen') and (idx == 0):
                         # Save also the very first base model, after the "normal training"
                         self.compare_models(
