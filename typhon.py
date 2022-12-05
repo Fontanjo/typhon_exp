@@ -6,6 +6,8 @@ from tqdm import tqdm
 import sklearn.metrics
 import numpy as np
 import pandas as pd
+from PIL import Image
+import cv2
 
 from typhon_model import TyphonModel
 import utils
@@ -325,7 +327,7 @@ class Typhon(object):
 
 
 
-        metrics_test = utils.get_segmentation_metrics(losses, aucs, confusion_matrix_dict)
+        metrics_test = utils.get_autoencoding_metrics(losses, aucs, confusion_matrix_dict)
         # metrics_test = utils.get_segmentation_metrics(self.loss_functions[dset_name], predictions_per_batch, confusion_matrix_dict)
 
         if verbose:
@@ -530,6 +532,34 @@ class Typhon(object):
             print(f"{self.opt_metrics[type]}: {self.best_metrics_dict[self.opt_metrics[type]]}")
 
 
+    # Save a sample of the current model
+    def save_sample(self, model, dset_name, epoch):
+        data_loader = self.train_data_loaders[dset_name]
+        # Load 1 batch
+        inputs, labels = next(iter(data_loader)) # Access only 1 batch
+        # inputs, labels = data_loader.get_batch()
+        # Pass to model
+        outputs = model(inputs, dset_name)
+        # Convert to numpy
+        inp, out, lab = inputs.cpu().detach().numpy(), outputs.cpu().detach().numpy(), labels.cpu().detach().numpy()
+        # Select first image of each batch and move color channel at the end
+        inp, out, lab = inp[0].transpose(1, 2, 0), out[0].transpose(1, 2, 0), lab[0].transpose(1, 2, 0)
+        ##########################################################################################################
+        # np.save(str(self.paths['samples'] / f'ep{epoch}_{dset_name}_input.npy'), inp)
+        # Convert to image
+        # img_mode = 'RGB'
+        # inp, out, lab = Image.fromarray((inp * 255).astype('uint8'), mode=img_mode), Image.fromarray((out * 255).astype('uint8'), mode=img_mode), Image.fromarray((lab * 255).astype('uint8'), mode=img_mode)
+        # Save images
+        # inp.save(str(self.paths['samples'] / f'ep{epoch}_{dset_name}_input.jpg'))
+        # out.save(str(self.paths['samples'] / f'ep{epoch}_{dset_name}_output.jpg'))
+        # lab.save(str(self.paths['samples'] / f'ep{epoch}_{dset_name}_label.jpg'))
+
+        cv2.imwrite(str(self.paths['samples'] / f'ep{epoch}_{dset_name}_input.jpg'), inp * 255)
+        cv2.imwrite(str(self.paths['samples'] / f'ep{epoch}_{dset_name}_output.jpg'), out * 255)
+        cv2.imwrite(str(self.paths['samples'] / f'ep{epoch}_{dset_name}_label.jpg'), lab * 255)
+
+
+
 ###############################################################################################################################
 ############################ PARALLEL TRANSFER LEARNING #######################################################################
 ###############################################################################################################################
@@ -565,10 +595,10 @@ class Typhon(object):
                     print(f">>> Aggregating metrics and saving")
                     self.aggregate_metrics(metrics_training, 'train', dset_name, epoch, 'trained', 'unfrozen')
                     self.aggregate_metrics(metrics_validation, 'validation', dset_name, epoch, 'trained', 'unfrozen')
-                    # print(f">>> AUC train: {metrics_training['auc']} ")
-                    # print(f">>> AUC val: {metrics_validation['auc']} ")
                     print(f">>> {self.opt_metrics['train']} train: {metrics_training[self.opt_metrics['train']]} ")
                     print(f">>> {self.opt_metrics['train']} val: {metrics_validation[self.opt_metrics['train']]} ")
+                    # Save a sample
+                    self.save_sample(self.model, dset_name, epoch)
                 # Save after each epoch, so we can quit and resume at any time
                 model_state = self.model.to_state_dict()
                 torch.save(model_state, self.paths['train_model_p'])

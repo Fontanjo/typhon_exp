@@ -4,7 +4,6 @@ import sklearn.metrics
 import torch
 import torchvision
 import glob
-import cv2
 
 
 class SegmentationDatasetFolder(torchvision.datasets.DatasetFolder):
@@ -55,14 +54,21 @@ class AutoencodingDatasetFolder(torchvision.datasets.DatasetFolder):
     def __getitem__(self, idx):
         img_path = self.data[idx]
         img = self.loader(img_path, self.img_dim)
-        img_mask = self.loader(img_mask_path, self.img_dim)
+        # Compute mode along width and height
+        mode = img.mode()[0].mode()[0]
+        # print(mode)
+        mode_tensor = torch.tensor([mode[0], mode[1], mode[2]]).expand(210, 160, 3).transpose(1, 2).transpose(0, 1).to(self.cuda_device)
+        # mode_tensor = torch.tensor([mode[2], mode[1], mode[0]]).expand(210, 160, 3).transpose(1, 2).transpose(0, 1).to(self.cuda_device)
+        # Remove mode from image
+        img_unmoded = img - mode_tensor
         # Ensure the sizes are correct
         if self.img_dim is not None:
             # Second argument in torch padding requires the size to add "before last dimension", "after last dimension", "before second-to-last dimension", ...
-            img = torch.nn.functional.pad(img, (0, self.img_dim[1], 0, self.img_dim[0]), 'constant', 0)[:, :self.img_dim[0], :self.img_dim[1]]
-
+            img_unmoded = torch.nn.functional.pad(img_unmoded, (0, self.img_dim[1], 0, self.img_dim[0]), 'constant', 0)[:, :self.img_dim[0], :self.img_dim[1]]
+        #
+        # np.save('./results_atari/20221204_first_test_0/run_plot/samples/aaaloader.npy', img_unmoded.cpu().numpy().transpose(1, 2, 0))
         # Return a copy as 'label'. Not optimal for memory, but preferred for readability
-        return img, img.detach().clone()
+        return img_unmoded, img_unmoded.detach().clone()
 
 
 class LoopLoader():
@@ -104,8 +110,7 @@ class LoopLoader():
                 img_dim=self.img_dim)
                 for split in which])
         else:
-            # Todo trow errow and say that task is not valid but shoul be in ['classification', 'segmentation']
-            raise Error
+            raise UnrecognizedTaskError("Task is not valid, should be in ['classification', 'segmentation', 'autoencoding']")
 
 
         self.data_loader = torch.utils.data.DataLoader(
@@ -158,6 +163,12 @@ def autoencoding_loader(cuda_device):
     def the_loader(path, dim=(256, 256)):
         # Load data
         ary = np.load(path)
+        # print(ary.shape)
+        # Move color channel in front
+        ary = ary.transpose(2, 0, 1)
+        # print(ary.shape)
+        # Normalize
+        ary = np.divide(ary, 255)
         # Send the tensor to the GPU/CPU depending on what device is available
         tensor = torch.from_numpy(ary).float().to(cuda_device)
         return tensor
