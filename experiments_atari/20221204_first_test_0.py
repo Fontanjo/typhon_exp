@@ -25,16 +25,16 @@ cfg = {
     # Hyperparams
     'lrates' : {
         # One per each DMs
-        'train' : [1e-2],
-        'spec' : [8e-10],
+        'train' : [1e-2, 1e-2],
+        'spec' : [8e-10, 8e-10],
         # Frozen is for sequential train only, when training with frozen feature extractor
-        'frozen' : [1e-7],
+        'frozen' : [1e-7, 1e-7],
     },
     'dropouts' : {
         # First one for the FE, following for the DMs
-        'train' : [0., 0.],
-        'spec' : [0., 0.],
-        'frozen' : [0., 0.],
+        'train' : [0., 0., 0.],
+        'spec' : [0., 0., 0.],
+        'frozen' : [0., 0., 0.],
     },
     'batch_size' : {
         'train' : 4,
@@ -48,9 +48,9 @@ cfg = {
     },
     'architecture' : 'AE2Long',
     # One per each DMs
-    'loss_functions' : [torch.nn.MSELoss()],
+    'loss_functions' : [torch.nn.MSELoss(), torch.nn.MSELoss()],
     # One per each DMs
-    'optimizers' : [torch.optim.Adam],
+    'optimizers' : [torch.optim.Adam, torch.optim.Adam],
     # Metrics used to compare models, i.e. which one is the best
     'opt_metrics' : {
         'bootstrap' : 'iou',
