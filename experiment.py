@@ -155,12 +155,14 @@ class Experiment:
             'bootstrap_model' : models_path / 'bootstrap_model.pth',
             # Plots
             'metrics' : experiment_path / 'run_plot',
-            'samples' : experiment_path / 'run_plot' / 'samples'
+            'samples_training' : experiment_path / 'run_plot' / 'samples_training',
+            'samples_spec' : experiment_path / 'run_plot' / 'samples_spec'
         }
 
         # Create directories
         self.paths['metrics'].mkdir(parents=True, exist_ok=True)
-        self.paths['samples'].mkdir(parents=True, exist_ok=True)
+        self.paths['samples_training'].mkdir(parents=True, exist_ok=True)
+        self.paths['samples_spec'].mkdir(parents=True, exist_ok=True)
         self.paths['logs'].mkdir(parents=True, exist_ok=True)
         models_path.mkdir(parents=True, exist_ok=True)
 

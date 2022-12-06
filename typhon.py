@@ -533,7 +533,7 @@ class Typhon(object):
 
 
     # Save a sample of the current model
-    def save_sample(self, model, dset_name, epoch):
+    def save_sample(self, path, model, dset_name, epoch):
         data_loader = self.test_data_loaders[dset_name]
         # Load 1 batch
         inputs, labels = next(iter(data_loader)) # Access only 1 batch
@@ -544,19 +544,11 @@ class Typhon(object):
         inp, out, lab = inputs.cpu().detach().numpy(), outputs.cpu().detach().numpy(), labels.cpu().detach().numpy()
         # Select first image of each batch and move color channel at the end
         inp, out, lab = inp[0].transpose(1, 2, 0), out[0].transpose(1, 2, 0), lab[0].transpose(1, 2, 0)
-        ##########################################################################################################
-        # np.save(str(self.paths['samples'] / f'ep{epoch}_{dset_name}_input.npy'), inp)
-        # Convert to image
-        # img_mode = 'RGB'
-        # inp, out, lab = Image.fromarray((inp * 255).astype('uint8'), mode=img_mode), Image.fromarray((out * 255).astype('uint8'), mode=img_mode), Image.fromarray((lab * 255).astype('uint8'), mode=img_mode)
-        # Save images
-        # inp.save(str(self.paths['samples'] / f'ep{epoch}_{dset_name}_input.jpg'))
-        # out.save(str(self.paths['samples'] / f'ep{epoch}_{dset_name}_output.jpg'))
-        # lab.save(str(self.paths['samples'] / f'ep{epoch}_{dset_name}_label.jpg'))
 
-        cv2.imwrite(str(self.paths['samples'] / f'ep{epoch}_{dset_name}_input.jpg'), inp * 255)
-        cv2.imwrite(str(self.paths['samples'] / f'ep{epoch}_{dset_name}_output.jpg'), out * 255)
-        cv2.imwrite(str(self.paths['samples'] / f'ep{epoch}_{dset_name}_label.jpg'), lab * 255)
+        # cv2.imwrite(str(self.paths['samples'] / f'ep{epoch}_{dset_name}_input.jpg'), inp * 255)
+        cv2.imwrite(path + f'/ep{epoch}_{dset_name}_input.jpg', inp * 255)
+        cv2.imwrite(path + f'/ep{epoch}_{dset_name}_output.jpg', out * 255)
+        cv2.imwrite(path + f'/ep{epoch}_{dset_name}_label.jpg', lab * 255)
 
 
 
@@ -598,7 +590,7 @@ class Typhon(object):
                     print(f">>> {self.opt_metrics['train']} train: {metrics_training[self.opt_metrics['train']]} ")
                     print(f">>> {self.opt_metrics['train']} val: {metrics_validation[self.opt_metrics['train']]} ")
                     # Save a sample
-                    self.save_sample(self.model, dset_name, epoch)
+                    self.save_sample(path=str(self.paths['samples_training']), model=self.model, dset_name=dset_name, epoch=epoch)
                 # Save after each epoch, so we can quit and resume at any time
                 model_state = self.model.to_state_dict()
                 torch.save(model_state, self.paths['train_model_p'])
@@ -642,6 +634,8 @@ class Typhon(object):
                     print(f">>> Aggregating metrics")
                     self.aggregate_metrics(metrics_training, 'train', dset_name, epoch, 'specialized', 'unfrozen')
                     self.aggregate_metrics(metrics_validation, 'validation', dset_name, epoch, 'specialized', 'unfrozen')
+                    # Save a sample
+                    self.save_sample(path=str(self.paths['samples_spec']), model=self.model, dset_name=dset_name, epoch=epoch)
 
                     self.compare_models(
                         model=self.spec_models[dset_name],
@@ -712,7 +706,7 @@ class Typhon(object):
                     print(f">>> {self.opt_metrics['train']} train: {metrics_training[self.opt_metrics['train']]} ")
                     print(f">>> {self.opt_metrics['train']} val: {metrics_validation[self.opt_metrics['train']]} ")
                     # Save a sample
-                    self.save_sample(self.model, dset_name, epoch)
+                    self.save_sample(path=str(self.paths['samples_training']), model=self.model, dset_name=dset_name, epoch=epoch)
                     if (feature_extractor == 'unfrozen') and (idx == 0):
                         # Save also the very first base model, after the "normal training"
                         self.compare_models(
@@ -780,6 +774,8 @@ class Typhon(object):
                 print(f">>> Aggregating metrics")
                 self.aggregate_metrics(metrics_training, 'train', dset_name, epoch, 'specialized', feature_extractor)
                 self.aggregate_metrics(metrics_validation, 'validation', dset_name, epoch, 'specialized', feature_extractor)
+                # Save a sample
+                self.save_sample(path=str(self.paths['samples_spec']), model=self.model, dset_name=dset_name, epoch=epoch)
 
                 self.compare_models(
                     model=self.spec_models[dset_name],
