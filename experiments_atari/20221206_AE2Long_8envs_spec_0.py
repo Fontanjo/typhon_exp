@@ -58,7 +58,10 @@ cfg = {
         'spec' : 'accuracy',
     },
     # Frequency of metrics collection during training
-    'metrics_freq' : 1000,
+    'metrics_freq' : {
+        'train': 1000,
+        'spec': 50,
+    },
     # Training task (classification / segmentation / autoencoding)
     'training_task' : 'autoencoding',
     # Paths and filenames

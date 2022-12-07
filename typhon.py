@@ -581,7 +581,7 @@ class Typhon(object):
                 print(f">>> Dset {dset_name}")
                 self.model.train()
                 self.train_step(self.model, dset_name, 'some')
-                if epoch % self.metrics_freq == 0:
+                if epoch % self.metrics_freq['train'] == 0:
                     metrics_training, metrics_validation = self.compute_metrics(self.model, dset_name)
                     # Add training and validation metrics for this epoch
                     print(f">>> Aggregating metrics and saving")
@@ -629,7 +629,7 @@ class Typhon(object):
                 print(f">>> Epoch {epoch}")
                 self.spec_models[dset_name].train()
                 self.train_step(self.spec_models[dset_name], dset_name, 'all')
-                if epoch % self.metrics_freq == 0:
+                if epoch % self.metrics_freq['spec'] == 0:
                     metrics_training, metrics_validation = self.compute_metrics(self.model, dset_name)
                     print(f">>> Aggregating metrics")
                     self.aggregate_metrics(metrics_training, 'train', dset_name, epoch, 'specialized', 'unfrozen')
