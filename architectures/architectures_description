@@ -20,3 +20,45 @@ unet -> https://medium.com/analytics-vidhya/unet-implementation-in-pytorch-idiot
 
   cnn = encoder block, based on Conv2d
   tcnn = decoder block, based on ConvTranspose2d
+
+
+## AUTOENCODERS ##
+
+AE2Long
+  uses conv with stride of 2 to reduce size
+  structure: conv2d, batch_norm, relu
+  central shape: 128x8x8 (8192)
+
+AE3Long
+  uses max pooling to reduce the size
+  structure: conv2d, max_pool, batch_norm, relu
+  uses convolution with different kernels: [9, 5, 3, 3, 3, 3, 3]
+  central shape: 512x2x2 (2048)
+
+AE3LongerP
+  same as AE3Long, but with an additional block at the beginning
+   which does not increase the number of channels, but still
+   reduces the size
+  central shape: 512x1x1 (512)
+
+
+
+## VARIATIONAL AUTOENCODERS ##
+At the center, samples from a distribution
+
+vae2
+  based on AE2Long
+  uses conv with stride of 2 to reduce size
+  structure: conv2d, batch_norm, relu
+  additional convolution for mu and var, with stride of 2
+  central shape: 128x4x4 (2048)
+
+vae2_mv
+  same of vae2, but returns mu and logvar together with the output
+  necessary to compute a better loss (BCE + KL-Divergence)
+
+vae3_mv
+  uses max pooling to reduce the size
+  structure: conv2d, max_pool, batch_norm, relu
+  additional convolution for mu and var, with stride of 2
+  central shape: 512x1x1 (512)
