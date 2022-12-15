@@ -29,6 +29,7 @@ class Typhon(object):
             opt_metrics,
             metrics_freq,
             training_task,
+            mu_var_loss,
             batch_size,
             cuda_device,
             resume,
@@ -49,6 +50,7 @@ class Typhon(object):
         self.opt_metrics = opt_metrics
         self.metrics_freq = metrics_freq
         self.training_task = training_task
+        self.mu_var_loss = mu_var_loss
         self.batch_size = batch_size
         self.cuda_device = cuda_device
         self.resume = resume
@@ -278,22 +280,21 @@ class Typhon(object):
             # Raw, unnormalized output required to compute the loss (with CrossEntropyLoss)
             outputs = model(inputs, dset_name)
 
+            # Some models (in particular VAEs) returns mu and var together with the output, to compute the loss
+            if self.mu_var_loss:
+                # Extract mu and var
+                outputs, mu, var = outputs
 
-            #####################################################
-            # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! #
-            # Storing all this is what causes the CUDA problem! #
-            # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! #
-            #####################################################
-            # predictions_per_batch['raw_predictions'] = torch.cat((predictions_per_batch['raw_predictions'], outputs), 0)
-            # predictions_per_batch['labels_tensor'] = torch.cat((predictions_per_batch['labels_tensor'].long(), labels), 0)
-            # Instead, compute directly the loss (add a group dimension as if there where multiple batches)
 
             # TODO: improve, useless to create empty tensor and then concatenate only 1 argument
             raw_predictions = torch.cat((raw_predictions, outputs), 0)
             labels_tensor = torch.cat((labels_tensor, labels), 0)
 
             # Compute loss
-            ls = self.loss_functions[dset_name](raw_predictions, labels_tensor).item()
+            if self.mu_var_loss:
+                ls =  self.loss_functions[dset_name](raw_predictions, labels_tensor, mu, var).item()
+            else:
+                ls = self.loss_functions[dset_name](raw_predictions, labels_tensor).item()
             losses.append(ls)
 
             # # Compute auc
@@ -464,8 +465,15 @@ class Typhon(object):
         inputs, labels = inputs.to(self.cuda_device), labels.to(self.cuda_device)
         # Run the model on the batch and get predictions
         predictions = model(inputs, dset_name)
-        # Compute loss between prediction and labels
-        loss = self.loss_functions[dset_name](predictions, labels)
+        # Some models (in particular VAEs) returns mu and var together with the output, to compute the loss
+        if self.mu_var_loss:
+            # Extract mu and var
+            predictions, mu, logvar = predictions
+            # Compute loss between prediction and labels
+            loss = self.loss_functions[dset_name](predictions, labels, mu, logvar)
+        else:
+            # Compute loss between prediction and labels
+            loss = self.loss_functions[dset_name](predictions, labels)
         # Backpropagation computes dloss/dx for each x param
         loss.backward()
         # Optimizer.step performs a parameter update based on gradients
@@ -540,6 +548,9 @@ class Typhon(object):
         # inputs, labels = data_loader.get_batch()
         # Pass to model
         outputs = model(inputs, dset_name)
+        # Some models (in particular VAEs) returns mu and var together with the output, to compute the loss
+        if self.mu_var_loss:
+            outputs, mu, var = outputs
         # Convert to numpy
         inp, out, lab = inputs.cpu().detach().numpy(), outputs.cpu().detach().numpy(), labels.cpu().detach().numpy()
         # Select first image of each batch and move color channel at the end

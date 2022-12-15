@@ -470,3 +470,18 @@ class GeneralizedDiceLoss(_AbstractDiceLoss):
         denominator = (denominator * w_l).clamp(min=self.epsilon)
 
         return 2 * (intersect.sum() / denominator.sum())
+
+
+
+class VAELoss(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.bce = torch.nn.BCELoss(reduction='sum')
+
+    def forward(self, raw_predictions, labels_tensor, mu, logvar):
+        # Compute BCE loss
+        bce_loss = self.bce(raw_predictions, labels_tensor)
+        # Compute KL-Divergence
+        KLD = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
+        # Aggregate them (sum)
+        return bce_loss + KLD

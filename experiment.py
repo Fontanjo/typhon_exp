@@ -66,6 +66,10 @@ class Experiment:
         # Convert to dict with dset name as key
         self.img_dims = {name:sizes for name, sizes in zip(self.cfg['dsets'], self.cfg['working_sizes'])}
 
+        # Set mu_var_loss as False if not specified (since it is only for autoencoding)
+        if self.cfg.get('mu_var_loss', None) is None:
+            self.cfg['mu_var_loss'] = False
+
         self.train_args = {
             'paths' : self.paths,
             'dsets_names' : self.cfg['dsets'],
@@ -82,6 +86,7 @@ class Experiment:
             'opt_metrics' : self.cfg['opt_metrics'],
             'metrics_freq': self.cfg['metrics_freq'],
             'training_task': self.cfg['training_task'],
+            'mu_var_loss': self.cfg['mu_var_loss'],
             'cuda_device' : self.cuda_device,
             'resume' : self.cfg['resume'],
             'img_dims' : self.img_dims
