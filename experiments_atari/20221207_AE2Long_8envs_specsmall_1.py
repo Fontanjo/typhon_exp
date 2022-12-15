@@ -26,7 +26,7 @@ cfg = {
     'lrates' : {
         # One per each DMs
         'train' : [1e-2, 1e-2, 1e-2, 1e-2, 1e-2, 1e-2, 1e-2, 1e-2],
-        'spec' : [1e-3, 1e-3, 1e-3, 1e-3, 1e-3, 1e-3, 1e-3, 1e-3],
+        'spec' : [1e-5, 1e-5, 1e-5, 1e-5, 1e-5, 1e-5, 1e-5, 1e-5],
         # Frozen is for sequential train only, when training with frozen feature extractor
         'frozen' : [1e-3, 1e-3, 1e-3, 1e-3, 1e-3, 1e-3, 1e-3, 1e-3],
     },

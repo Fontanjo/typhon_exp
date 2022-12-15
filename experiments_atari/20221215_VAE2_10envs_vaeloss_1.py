@@ -7,6 +7,7 @@ sys.path.insert(0, os.getcwd())
 from experiment import Experiment
 from pathlib import Path
 import utils
+from utils import VAELoss
 
 
 cfg = {
@@ -14,7 +15,7 @@ cfg = {
     'trg_gpu' : sys.argv[-1] if not sys.argv[-1].endswith('.py') else Path(__file__).stem.split('_')[-1],
     'trg_n_cpu' : 8, # how many CPU threads to use
     # Datasets
-    'dsets' : ['DemonAttack-v5', 'FishingDerby-v5', 'Frostbite-v5', 'NameThisGame-v5', 'Phoenix-v5', 'Qbert-v5', 'Seaquest-v5', 'SpaceInvaders-v5'],
+    'dsets' : ['DemonAttack-v5', 'FishingDerby-v5', 'Frostbite-v5', 'Kangaroo-v5', 'NameThisGame-v5', 'Phoenix-v5', 'Qbert-v5', 'Seaquest-v5', 'SpaceInvaders-v5', 'TimePilot-v5'],
     'trg_dset' : 'DemonAttack-v5',
     # Pad and crop to get specific dimension
     # One for each dset, or just one if same for all. None to leave as it is
@@ -25,16 +26,16 @@ cfg = {
     # Hyperparams
     'lrates' : {
         # One per each DMs
-        'train' : [1e-2, 1e-2, 1e-2, 1e-2, 1e-2, 1e-2, 1e-2, 1e-2],
-        'spec' : [1e-3, 1e-3, 1e-3, 1e-3, 1e-3, 1e-3, 1e-3, 1e-3],
+        'train' : [1e-6, 1e-6, 1e-6, 1e-6, 1e-6, 1e-6, 1e-6, 1e-6, 1e-6, 1e-6],
+        'spec' : [1e-5, 1e-5, 1e-5, 1e-5, 1e-5, 1e-5, 1e-5, 1e-5, 1e-5, 1e-5],
         # Frozen is for sequential train only, when training with frozen feature extractor
-        'frozen' : [1e-3, 1e-3, 1e-3, 1e-3, 1e-3, 1e-3, 1e-3, 1e-3],
+        'frozen' : [1e-3, 1e-3, 1e-3, 1e-3, 1e-3, 1e-3, 1e-3, 1e-3, 1e-3, 1e-3],
     },
     'dropouts' : {
         # First one for the FE, following for the DMs
-        'train' : [0., 0., 0., 0., 0., 0., 0., 0., 0.],
-        'spec' : [0., 0., 0., 0., 0., 0., 0., 0., 0.],
-        'frozen' : [0., 0., 0., 0., 0., 0., 0., 0., 0.],
+        'train' : [0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.],
+        'spec' : [0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.],
+        'frozen' : [0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.],
     },
     'batch_size' : {
         'train' : 8,
@@ -44,13 +45,13 @@ cfg = {
     'nb_batches_per_epoch' : 1,
     'epochs' : {
         'train' : 20000,
-        'spec' : 100,
+        'spec' : 0,
     },
-    'architecture' : 'AE2Long',
+    'architecture' : 'vae2_mv',
     # One per each DMs
-    'loss_functions' : [torch.nn.MSELoss(), torch.nn.MSELoss(), torch.nn.MSELoss(), torch.nn.MSELoss(), torch.nn.MSELoss(), torch.nn.MSELoss(), torch.nn.MSELoss(), torch.nn.MSELoss()],
+    'loss_functions' : [VAELoss(), VAELoss(), VAELoss(), VAELoss(), VAELoss(), VAELoss(), VAELoss(), VAELoss(), VAELoss(), VAELoss()],
     # One per each DMs
-    'optimizers' : [torch.optim.Adam, torch.optim.Adam, torch.optim.Adam, torch.optim.Adam, torch.optim.Adam, torch.optim.Adam, torch.optim.Adam, torch.optim.Adam],
+    'optimizers' : [torch.optim.Adam, torch.optim.Adam, torch.optim.Adam, torch.optim.Adam, torch.optim.Adam, torch.optim.Adam, torch.optim.Adam, torch.optim.Adam, torch.optim.Adam, torch.optim.Adam],
     # Metrics used to compare models, i.e. which one is the best
     'opt_metrics' : {
         'bootstrap' : 'iou',
@@ -59,11 +60,14 @@ cfg = {
     },
     # Frequency of metrics collection during training ans specialization
     'metrics_freq' : {
-        'train': 1000,
+        'train': 500,
         'spec': 10,
     },
     # Training task (classification / segmentation / autoencoding)
     'training_task' : 'autoencoding',
+    # Only for autoencoding. Some loss functions requires mu and logvar as well (in particular for VAEs)
+    #  In these cases, make sure the dm returns 3 objects (output, mu, logvar)
+    'mu_var_loss': True,
     # Paths and filenames
     'dsets_path' : 'datasets_autoencoding',
     'ramdir'     : '/dev/shm', # copying data to RAM once to speed it up
