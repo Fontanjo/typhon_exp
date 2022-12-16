@@ -476,7 +476,8 @@ class GeneralizedDiceLoss(_AbstractDiceLoss):
 class VAELoss(torch.nn.Module):
     def __init__(self):
         super().__init__()
-        self.bce = torch.nn.BCELoss(reduction='sum')
+        # self.bce = torch.nn.BCELoss(reduction='sum')
+        self.bce = torch.nn.MSELoss()
 
     def forward(self, raw_predictions, labels_tensor, mu, logvar):
         # Compute BCE loss

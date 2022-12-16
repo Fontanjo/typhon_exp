@@ -553,8 +553,18 @@ class Typhon(object):
             outputs, mu, var = outputs
         # Convert to numpy
         inp, out, lab = inputs.cpu().detach().numpy(), outputs.cpu().detach().numpy(), labels.cpu().detach().numpy()
+        # Re-add negative values (if there was any '0' in the original image, this will have -'value of the mode' after removing the mode)
+        #  Would be better to store the mode when removing it
+        if self.training_task == 'autoencoding':
+            for color_channel in range(len(inp)):
+                min_channel = np.min(inp[color_channel])
+                inp[color_channel] -= min_channel
+                out[color_channel] -= min_channel
+                lab[color_channel] -= min_channel
         # Select first image of each batch and move color channel at the end
         inp, out, lab = inp[0].transpose(1, 2, 0), out[0].transpose(1, 2, 0), lab[0].transpose(1, 2, 0)
+
+
 
         # cv2.imwrite(str(self.paths['samples'] / f'ep{epoch}_{dset_name}_input.jpg'), inp * 255)
         cv2.imwrite(path + f'/ep{epoch}_{dset_name}_input.jpg', inp * 255)
