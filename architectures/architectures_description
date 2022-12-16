@@ -29,7 +29,7 @@ AE2Long
   structure: conv2d, batch_norm, relu
   central shape: 128x8x8 (8192)
 
-AE3Long
+AE3LongP
   uses max pooling to reduce the size
   structure: conv2d, max_pool, batch_norm, relu
   uses convolution with different kernels: [9, 5, 3, 3, 3, 3, 3]
@@ -62,3 +62,8 @@ vae3_mv
   structure: conv2d, max_pool, batch_norm, relu
   additional convolution for mu and var, with stride of 2
   central shape: 512x1x1 (512)
+
+vae3_nosig_mv
+  same as vae3, but without a sigmoid() at the end of the dm
+  this is important because after removing the mode, images will have some negative values
+  since sigmoid() will only give positive value, it prevents a correct learning
