@@ -54,21 +54,32 @@ class AutoencodingDatasetFolder(torchvision.datasets.DatasetFolder):
     def __getitem__(self, idx):
         img_path = self.data[idx]
         img = self.loader(img_path, self.img_dim)
-        # Compute mode along width and height
-        mode = img.mode()[0].mode()[0]
-        # print(mode)
-        mode_tensor = torch.tensor([mode[0], mode[1], mode[2]]).expand(210, 160, 3).transpose(1, 2).transpose(0, 1).to(self.cuda_device)
-        # mode_tensor = torch.tensor([mode[2], mode[1], mode[0]]).expand(210, 160, 3).transpose(1, 2).transpose(0, 1).to(self.cuda_device)
-        # Remove mode from image
-        img_unmoded = img - mode_tensor
         # Ensure the sizes are correct
         if self.img_dim is not None:
             # Second argument in torch padding requires the size to add "before last dimension", "after last dimension", "before second-to-last dimension", ...
-            img_unmoded = torch.nn.functional.pad(img_unmoded, (0, self.img_dim[1], 0, self.img_dim[0]), 'constant', 0)[:, :self.img_dim[0], :self.img_dim[1]]
-        #
-        # np.save('./results_atari/20221204_first_test_0/run_plot/samples/aaaloader.npy', img_unmoded.cpu().numpy().transpose(1, 2, 0))
+            img = torch.nn.functional.pad(img, (0, self.img_dim[1], 0, self.img_dim[0]), 'constant', 0)[:, :self.img_dim[0], :self.img_dim[1]]
         # Return a copy as 'label'. Not optimal for memory, but preferred for readability
-        return img_unmoded, img_unmoded.detach().clone()
+        return img, img.detach().clone()
+
+    # def __getitem__(self, idx):
+    #     img_path = self.data[idx]
+    #     img = self.loader(img_path, self.img_dim)
+    #     # Compute mode along width and height
+    #     mode = img.mode()[0].mode()[0]
+    #     print(img.shape)
+    #     # print(mode)
+    #     mode_tensor = torch.tensor([mode[0], mode[1], mode[2]]).expand(210, 160, 3).transpose(1, 2).transpose(0, 1).to(self.cuda_device)
+    #     # mode_tensor = torch.tensor([mode[2], mode[1], mode[0]]).expand(210, 160, 3).transpose(1, 2).transpose(0, 1).to(self.cuda_device)
+    #     # Remove mode from image
+    #     img_unmoded = img - mode_tensor
+    #     # Ensure the sizes are correct
+    #     if self.img_dim is not None:
+    #         # Second argument in torch padding requires the size to add "before last dimension", "after last dimension", "before second-to-last dimension", ...
+    #         img_unmoded = torch.nn.functional.pad(img_unmoded, (0, self.img_dim[1], 0, self.img_dim[0]), 'constant', 0)[:, :self.img_dim[0], :self.img_dim[1]]
+    #     #
+    #     # np.save('./results_atari/20221204_first_test_0/run_plot/samples/aaaloader.npy', img_unmoded.cpu().numpy().transpose(1, 2, 0))
+    #     # Return a copy as 'label'. Not optimal for memory, but preferred for readability
+    #     return img_unmoded, img_unmoded.detach().clone()
 
 
 class LoopLoader():
@@ -282,7 +293,7 @@ def get_segmentation_metrics(losses, aucs, confusion_matrix_dict):
     # Receive the per-batch auc and average them
     #  In some cases, the auc can not be computed and is saved as 0 (when only 1 label)
     #  Ignore this cases for the average
-    auc = np.mean([a for a in aucs if a is not 0])
+    auc = np.mean([a for a in aucs if a != 0])
 
     return {
         'loss': loss, 'accuracy': accuracy,
@@ -473,11 +484,25 @@ class GeneralizedDiceLoss(_AbstractDiceLoss):
 
 
 
-class VAELoss(torch.nn.Module):
+class VAELossMSE(torch.nn.Module):
     def __init__(self):
         super().__init__()
         # self.bce = torch.nn.BCELoss(reduction='sum')
-        self.bce = torch.nn.MSELoss()
+        self.mse = torch.nn.MSELoss()
+
+    def forward(self, raw_predictions, labels_tensor, mu, logvar):
+        # Compute BCE loss
+        mse_loss = self.mse(raw_predictions, labels_tensor)
+        # Compute KL-Divergence
+        KLD = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
+        # Aggregate them (sum)
+        return mse_loss + KLD
+
+
+class VAELossBCE(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.bce = torch.nn.BCELoss(reduction='sum')
 
     def forward(self, raw_predictions, labels_tensor, mu, logvar):
         # Compute BCE loss

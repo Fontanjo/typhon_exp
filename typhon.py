@@ -274,11 +274,23 @@ class Typhon(object):
             raw_predictions = torch.tensor([]).to(self.cuda_device)
             labels_tensor = torch.tensor([]).to(self.cuda_device)
 
+            input = inputs.to(self.cuda_device)
+            # mode = inputs.mode(dim=0)[0].mode()[0].mode()[0]
+            # Compute mode of first image of the batch
+            mode = inputs[0][:, :210, :160].mode()[0].mode()[0]
+            # Expand to match size
+            mode_tensor = torch.tensor([mode[0], mode[1], mode[2]]).expand(256, 256, 3).transpose(1, 2).transpose(0, 1).to(self.cuda_device)
+            # Remove mode from inputs (but NOT from labels)
+            #  We keep mode in the label to have values in [0,1] and be able to use BCE. In any case, the mode can be learned by the
+            #  dms independently from the input
+            inputs_unmoded = inputs
+            inputs_unmoded[:, :, :210, :160] -= mode_tensor[:, :210, :160]
+
             # Send data to GPU if available
-            inputs, labels = inputs.to(self.cuda_device), labels.to(self.cuda_device)
+            inputs_unmoded, labels = inputs_unmoded.to(self.cuda_device), labels.to(self.cuda_device)
             # Feed the model and get outputs
             # Raw, unnormalized output required to compute the loss (with CrossEntropyLoss)
-            outputs = model(inputs, dset_name)
+            outputs = model(inputs_unmoded, dset_name)
 
             # Some models (in particular VAEs) returns mu and var together with the output, to compute the loss
             if self.mu_var_loss:
@@ -437,7 +449,7 @@ class Typhon(object):
                 test_loop_loader = utils.LoopLoader(
                     dset_path=self.paths['dsets'][dset_name],
                     which=['test'],
-                    batch_size=1,
+                    batch_size=1,  # TODO Why 1??
                     cuda_device=self.cuda_device,
                     training_task=self.training_task,
                     img_dim=self.img_dims[dset_name])
@@ -545,6 +557,14 @@ class Typhon(object):
         data_loader = self.test_data_loaders[dset_name]
         # Load 1 batch
         inputs, labels = next(iter(data_loader)) # Access only 1 batch
+        # Compute mode along width and height (of the original image)
+        mode = inputs[0][:, :210, :160].mode()[0].mode()[0]
+        # Expand to match size
+        mode_tensor = torch.tensor([mode[0], mode[1], mode[2]]).expand(256, 256, 3).transpose(1, 2).transpose(0, 1).to(self.cuda_device)
+        # Remove mode from inputs (but NOT from labels)
+        #  We keep mode in the label to have values in [0,1] and be able to use BCE. In any case, the mode can be learned by the
+        #  dms independently from the input
+        inputs[:, :, :210, :160] -= mode_tensor[:, :210, :160]
         # inputs, labels = data_loader.get_batch()
         # Pass to model
         outputs = model(inputs, dset_name)
@@ -553,14 +573,14 @@ class Typhon(object):
             outputs, mu, var = outputs
         # Convert to numpy
         inp, out, lab = inputs.cpu().detach().numpy(), outputs.cpu().detach().numpy(), labels.cpu().detach().numpy()
-        # Re-add negative values (if there was any '0' in the original image, this will have -'value of the mode' after removing the mode)
-        #  Would be better to store the mode when removing it
-        if self.training_task == 'autoencoding':
-            for color_channel in range(len(inp)):
-                min_channel = np.min(inp[color_channel])
-                inp[color_channel] -= min_channel
-                out[color_channel] -= min_channel
-                lab[color_channel] -= min_channel
+        # # Re-add negative values (if there was any '0' in the original image, this will have -'value of the mode' after removing the mode)
+        # #  Would be better to store the mode when removing it
+        # if self.training_task == 'autoencoding':
+        #     for color_channel in range(len(inp)):
+        #         min_channel = np.min(inp[color_channel])
+        #         inp[color_channel] -= min_channel
+        #         out[color_channel] -= min_channel
+        #         lab[color_channel] -= min_channel
         # Select first image of each batch and move color channel at the end
         inp, out, lab = inp[0].transpose(1, 2, 0), out[0].transpose(1, 2, 0), lab[0].transpose(1, 2, 0)
 
