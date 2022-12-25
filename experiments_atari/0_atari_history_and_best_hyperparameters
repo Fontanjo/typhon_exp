@@ -1,0 +1,29 @@
+Tried:
+
+- Problem: much effort at the beginning of learning is wasted in learning general env features (bg color, fixed pixels, ...)
+  - Idea: overfit dm to mode image (of entire dset), then train loading it
+  - Results: not working at all
+
+
+- Problem: lr much different for every env
+  - Idea: test each environment alone and find best lr
+    - Then use best lr found --> results: actually not so well
+    - Or, use the smallest one* --> results: not yet final results, but seems promising (with 3 envs at least)
+    - Or, 'smooth' a bit to make more similar --> results: disaster
+
+
+
+* Try to do more iterations for env which requires a bigger lr, to compesate the fact that we are using a smaller one
+  e.g. phoenix requires 1e-3, qbert requires 1e-5  --> use 1e-5 for all, but do 100x more times phoenix
+  Not tried yet, but not very optimistic..
+
+
+
+Best lr for vae3_mv:
+  - Phoenix:      1e-3
+  - DemonAttack:  5e-5
+  - Qbert:        5e-3 (not perfect)
+  - Seaquest:     not found yet (tested 1e-3, 1e-4, 5e-5)
+  - TimePilot:    not found yet (tested 1e-3, 1e-4, 1e-5)
+  - Frostbite:    not found yet
+  - FishingDerby: not found yet
