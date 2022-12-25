@@ -68,6 +68,8 @@ class VAE3(torch.nn.Module):
         #  we could simply keep them from the fe output. But this way we avoid changing the base structure
         #  with useless and difficult-to-read conditional statements
         x, mu, logvar = x
+        # Reshape x
+        x = x.view(-1, 512, 1, 1)
         # Decode
         x = self.decoder_cnn(x)
         return x, mu, logvar

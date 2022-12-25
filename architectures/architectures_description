@@ -42,6 +42,14 @@ AE3LongerP
   central shape: 512x1x1 (512)
 
 
+AE4LongP
+  same fe as AE3LongP, but decoder (dm) uses also Conv2d after each ConvTranspose
+  central shape: 512x2x2 (2048)
+
+AE5LongP
+  similar as AE3LongP, but with only 3x3 kernels
+
+
 
 ## VARIATIONAL AUTOENCODERS ##
 At the center, samples from a distribution

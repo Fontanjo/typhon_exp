@@ -4,10 +4,10 @@ import torch.nn as nn
 
 
 def get_block(dropout, in_channels=1):
-    return VAE3()
+    return VAE2()
 
 
-class VAE3(torch.nn.Module):
+class VAE2(torch.nn.Module):
     def __init__(self):
         super().__init__()
 
