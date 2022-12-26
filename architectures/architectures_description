@@ -68,6 +68,7 @@ vae2_mv
 vae3_mv
   uses max pooling to reduce the size
   structure: conv2d, max_pool, batch_norm, relu
+  kernels: [9, 5, 3, 3, 3, 3, 3]
   additional convolution for mu and var, with stride of 2
   central shape: 512x1x1 (512)
 
@@ -75,3 +76,8 @@ vae3_nosig_mv
   same as vae3, but without a sigmoid() at the end of the dm
   this is important because after removing the mode, images will have some negative values
   since sigmoid() will only give positive value, it prevents a correct learning
+
+vae5_mv
+  same as vae3_mv, but takes an input of shape (210, 160, 3) (the shape of the atari images)
+  the fe remains exactly the same
+  the output_paddings in the decoder are set in order to reconstruct the correct initial shape
