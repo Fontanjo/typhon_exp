@@ -25,5 +25,5 @@ Best lr for vae3_mv:
   - Qbert:        5e-3 (not perfect)
   - Seaquest:     not found yet (tested 1e-3, 1e-4, 5e-5)
   - TimePilot:    not found yet (tested 1e-3, 1e-4, 1e-5)
-  - Frostbite:    not found yet
-  - FishingDerby: not found yet
+  - Frostbite:    not found yet (tested 1e-3, 1e-4, 1e-5)
+  - FishingDerby: not found yet (tested 1e-3, 1e-4, 1e-5)
