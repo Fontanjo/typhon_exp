@@ -276,7 +276,8 @@ class Typhon(object):
 
             input = inputs.to(self.cuda_device)
             # mode = inputs.mode(dim=0)[0].mode()[0].mode()[0]
-            # Compute mode of first image of the batch
+            # Compute mode of first image of the batch, withouth considering the padding
+            # TODO remove hardcoded :210, :160
             mode = inputs[0][:, :210, :160].mode()[0].mode()[0]
             # Expand to match size
             mode_tensor = torch.tensor([mode[0], mode[1], mode[2]]).expand(256, 256, 3).transpose(1, 2).transpose(0, 1).to(self.cuda_device)
@@ -286,8 +287,15 @@ class Typhon(object):
             inputs_unmoded = inputs
             inputs_unmoded[:, :, :210, :160] -= mode_tensor[:, :210, :160]
 
+            # Take absolute value (to avoid negative values after removing the mode)
+            inputs_unmoded = torch.abs(inputs_unmoded)
+
+            # Copy modifications to label
+            labels = inputs_unmoded
+
             # Send data to GPU if available
             inputs_unmoded, labels = inputs_unmoded.to(self.cuda_device), labels.to(self.cuda_device)
+
             # Feed the model and get outputs
             # Raw, unnormalized output required to compute the loss (with CrossEntropyLoss)
             outputs = model(inputs_unmoded, dset_name)
@@ -565,6 +573,13 @@ class Typhon(object):
         #  We keep mode in the label to have values in [0,1] and be able to use BCE. In any case, the mode can be learned by the
         #  dms independently from the input
         inputs[:, :, :210, :160] -= mode_tensor[:, :210, :160]
+
+        # Take absolute value (to avoid negative values after removing the mode)
+        inputs = torch.abs(inputs)
+
+        # Copy modifications to label
+        labels = inputs
+
         # inputs, labels = data_loader.get_batch()
         # Pass to model
         outputs = model(inputs, dset_name)
