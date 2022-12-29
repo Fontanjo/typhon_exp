@@ -859,6 +859,8 @@ class Typhon(object):
 ###############################################################################################################################
     @torch.no_grad()
     def bootstrap(self):
+        if self.training_task == 'autoencoding':
+            return self.bootstrap_autoencoding()
         utils.print_time("BOOTSTRAP")
         self.load_data('bootstrap')
 
@@ -957,6 +959,89 @@ class Typhon(object):
         torch.save(model.to_state_dict(), self.paths['bootstrap_model'])
 
         print("> Random initialization done, model is saved")
+
+
+    @torch.no_grad()
+    def bootstrap_autoencoding(self):
+        utils.print_time("BOOTSTRAP")
+        self.load_data('bootstrap') # Load train data (and thus validation)
+
+        best = {dset:{} for dset in self.dsets_names}
+
+        for nmodel in tqdm(range(self.bootstrap_size)):
+            # Take the dropouts of the training (no impact since we only test)
+            dropout_fe, dropouts_dm = self.dropouts['train']
+
+            model = TyphonModel(
+                dropout_fe=dropout_fe,
+                dropouts_dm=dropouts_dm,
+                architecture=self.architecture,
+                dsets_names=self.dsets_names)
+
+            nbetterheads = 0
+            # Need to reset the dict at each new model
+            current = {dset:{} for dset in self.dsets_names}
+            current['model'] = model
+            # To speed up bootstrap, go to next iteration when the model is bad
+            bad_model = False
+
+
+            def smaller_data_loader(limit, loader):
+                i = 0
+                for i, el in enumerate(loader):
+                    i += 1
+                    if i >= limit:
+                        yield el
+                        return
+
+            # Evaluate 500 images
+            nb_epochs = 500 / self.batch_size['train']
+
+            for dset_name in self.dsets_names:
+                assert self.paths['dsets'][dset_name].stem == dset_name, "Dataset not corresponding to the path"
+                # At least for the moment, use loss
+                assert self.opt_metrics['bootstrap'] == 'loss'
+
+
+
+                # Test model
+                print(f">>> {dset_name}")
+                metrics_test = self.test_model(
+                    model=model,
+                    dset_name=dset_name,
+                    test_data_loader=smaller_data_loader(nb_epochs, self.bootstrap_data_loaders[dset_name]))
+                    # test_data_loader=self.bootstrap_data_loaders[dset_name])
+                    # test_data_loader=self.validation_data_loaders[dset_name]) # Use only validation, to be faster (dsets are already generated with the purpose of having different images)
+
+
+                current[dset_name] = metrics_test
+
+                # We need a basis model at the first iteration
+                if nmodel == 0:
+                    best['model'] = model
+                    best[dset_name] = metrics_test
+                    print(f">>> First iteration for {dset_name}, {self.opt_metrics['bootstrap']}: {best[dset_name][self.opt_metrics['bootstrap']]}")
+                    continue
+
+                new_score = current[dset_name][self.opt_metrics['bootstrap']]
+                best_score = best[dset_name][self.opt_metrics['bootstrap']]
+
+
+            opt_metrics = [current[dset_name][self.opt_metrics['bootstrap']] for dset_name in self.dsets_names]
+            best_metrics = [best[dset_name][self.opt_metrics['bootstrap']] for dset_name in self.dsets_names]
+
+            if sum(opt_metrics) > sum(best_metrics):
+                best = current
+                for dset_name in self.dsets_names:
+                    print(f">>> New {self.opt_metrics['bootstrap']} score for {dset_name}: {best[dset_name][self.opt_metrics['bootstrap']]}")
+                print(f'>>> Sum: {sum(opt_metrics)}')
+
+
+        torch.save(best['model'].to_state_dict(), self.paths['bootstrap_model'])
+
+        print("> Bootstrap done, best model is saved:")
+        for dset_name in self.dsets_names:
+            print(f"> {self.opt_metrics['bootstrap']} score for {dset_name}: {best[dset_name][self.opt_metrics['bootstrap']]}")
 
 
 
