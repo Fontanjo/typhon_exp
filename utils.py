@@ -58,6 +58,15 @@ class AutoencodingDatasetFolder(torchvision.datasets.DatasetFolder):
         if self.img_dim is not None:
             # Second argument in torch padding requires the size to add "before last dimension", "after last dimension", "before second-to-last dimension", ...
             img = torch.nn.functional.pad(img, (0, self.img_dim[1], 0, self.img_dim[0]), 'constant', 0)[:, :self.img_dim[0], :self.img_dim[1]]
+        # Remove mode
+        mode = img.mode()[0].mode()[0]
+        # Expand to match size
+        mode_tensor = torch.tensor([mode[0], mode[1], mode[2]]).expand(img.shape[1], img.shape[2], 3).transpose(1, 2).transpose(0, 1).to(self.cuda_device)
+        # Remove mode from inputs (but NOT from labels)
+        #  We keep mode in the label to have values in [0,1] and be able to use BCE. In any case, the mode can be learned by the
+        #  dms independently from the input
+        img -= mode_tensor
+        img = torch.abs(img)
         # Return a copy as 'label'. Not optimal for memory, but preferred for readability
         return img, img.detach().clone()
 

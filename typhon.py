@@ -274,31 +274,35 @@ class Typhon(object):
             raw_predictions = torch.tensor([]).to(self.cuda_device)
             labels_tensor = torch.tensor([]).to(self.cuda_device)
 
-            input = inputs.to(self.cuda_device)
+            input, labels = inputs.to(self.cuda_device), labels.to(self.cuda_device)
+
             # mode = inputs.mode(dim=0)[0].mode()[0].mode()[0]
             # Compute mode of first image of the batch, withouth considering the padding
             # TODO remove hardcoded :210, :160
-            mode = inputs[0][:, :210, :160].mode()[0].mode()[0]
-            # Expand to match size
-            mode_tensor = torch.tensor([mode[0], mode[1], mode[2]]).expand(256, 256, 3).transpose(1, 2).transpose(0, 1).to(self.cuda_device)
-            # Remove mode from inputs (but NOT from labels)
-            #  We keep mode in the label to have values in [0,1] and be able to use BCE. In any case, the mode can be learned by the
-            #  dms independently from the input
-            inputs_unmoded = inputs
-            inputs_unmoded[:, :, :210, :160] -= mode_tensor[:, :210, :160]
-
-            # Take absolute value (to avoid negative values after removing the mode)
-            inputs_unmoded = torch.abs(inputs_unmoded)
-
-            # Copy modifications to label
-            labels = inputs_unmoded
+            # mode = inputs[0][:, :210, :160].mode()[0].mode()[0]
+            # # Expand to match size
+            # mode_tensor = torch.tensor([mode[0], mode[1], mode[2]]).expand(256, 256, 3).transpose(1, 2).transpose(0, 1).to(self.cuda_device)
+            # # Remove mode from inputs (but NOT from labels)
+            # #  We keep mode in the label to have values in [0,1] and be able to use BCE. In any case, the mode can be learned by the
+            # #  dms independently from the input
+            # inputs_unmoded = inputs
+            # inputs_unmoded[:, :, :210, :160] -= mode_tensor[:, :210, :160]
+            #
+            # # Take absolute value (to avoid negative values after removing the mode)
+            # inputs_unmoded = torch.abs(inputs_unmoded)
+            #
+            # # Copy modifications to label
+            # # labels = copy.deepcopy(inputs_unmoded)
+            # labels = inputs_unmoded.detach().clone()
+            # labels[:, :, :210, :160] -= mode_tensor[:, :210, :160]
+            # labels = torch.abs(labels)
 
             # Send data to GPU if available
-            inputs_unmoded, labels = inputs_unmoded.to(self.cuda_device), labels.to(self.cuda_device)
+            # inputs_unmoded, labels = inputs_unmoded.to(self.cuda_device), labels.to(self.cuda_device)
 
             # Feed the model and get outputs
             # Raw, unnormalized output required to compute the loss (with CrossEntropyLoss)
-            outputs = model(inputs_unmoded, dset_name)
+            outputs = model(inputs, dset_name)
 
             # Some models (in particular VAEs) returns mu and var together with the output, to compute the loss
             if self.mu_var_loss:
@@ -479,6 +483,12 @@ class Typhon(object):
     def train_on_batch(self, model, dset_name, batch):
         assert model.training == True, "Model not in training mode"
         inputs, labels = batch
+        # if self.training_task == 'autoencoding':
+        #     mode = inputs[0][:, :210, :160].mode()[0].mode()[0]
+        #     mode_tensor = torch.tensor([mode[0], mode[1], mode[2]]).expand(256, 256, 3).transpose(1, 2).transpose(0, 1).to(self.cuda_device)
+        #     inputs[:, :, :210, :160] -= mode_tensor[:, :210, :160]
+        #     inputs = torch.abs(inputs)
+        #     labels = inputs.detach().clone()
         # Clear old gradient (default is to accumulate)
         self.optimizers[dset_name].zero_grad()
         # Send data to GPU if available
@@ -566,19 +576,22 @@ class Typhon(object):
         # Load 1 batch
         inputs, labels = next(iter(data_loader)) # Access only 1 batch
         # Compute mode along width and height (of the original image)
-        mode = inputs[0][:, :210, :160].mode()[0].mode()[0]
-        # Expand to match size
-        mode_tensor = torch.tensor([mode[0], mode[1], mode[2]]).expand(256, 256, 3).transpose(1, 2).transpose(0, 1).to(self.cuda_device)
-        # Remove mode from inputs (but NOT from labels)
-        #  We keep mode in the label to have values in [0,1] and be able to use BCE. In any case, the mode can be learned by the
-        #  dms independently from the input
-        inputs[:, :, :210, :160] -= mode_tensor[:, :210, :160]
-
-        # Take absolute value (to avoid negative values after removing the mode)
-        inputs = torch.abs(inputs)
-
-        # Copy modifications to label
-        labels = inputs
+        # mode = inputs[0][:, :210, :160].mode()[0].mode()[0]
+        # # Expand to match size
+        # mode_tensor = torch.tensor([mode[0], mode[1], mode[2]]).expand(256, 256, 3).transpose(1, 2).transpose(0, 1).to(self.cuda_device)
+        # # Remove mode from inputs (but NOT from labels)
+        # #  We keep mode in the label to have values in [0,1] and be able to use BCE. In any case, the mode can be learned by the
+        # #  dms independently from the input
+        # inputs[:, :, :210, :160] -= mode_tensor[:, :210, :160]
+        #
+        # # Take absolute value (to avoid negative values after removing the mode)
+        # inputs = torch.abs(inputs)
+        #
+        # # Copy modifications to label
+        # # labels = copy.deepcopy(inputs)
+        # labels = inputs.detach().clone()
+        # labels[:, :, :210, :160] -= mode_tensor[:, :210, :160]
+        # labels = torch.abs(labels)
 
         # inputs, labels = data_loader.get_batch()
         # Pass to model
@@ -968,6 +981,17 @@ class Typhon(object):
 
         best = {dset:{} for dset in self.dsets_names}
 
+        def smaller_data_loader(limit, loader):
+            i = 0
+            for i, el in enumerate(loader):
+                i += 1
+                if i >= limit:
+                    yield el
+                    return
+
+        # Evaluate 500 images
+        nb_epochs = 250 / self.batch_size['train']
+
         for nmodel in tqdm(range(self.bootstrap_size)):
             # Take the dropouts of the training (no impact since we only test)
             dropout_fe, dropouts_dm = self.dropouts['train']
@@ -978,31 +1002,14 @@ class Typhon(object):
                 architecture=self.architecture,
                 dsets_names=self.dsets_names)
 
-            nbetterheads = 0
             # Need to reset the dict at each new model
             current = {dset:{} for dset in self.dsets_names}
             current['model'] = model
-            # To speed up bootstrap, go to next iteration when the model is bad
-            bad_model = False
-
-
-            def smaller_data_loader(limit, loader):
-                i = 0
-                for i, el in enumerate(loader):
-                    i += 1
-                    if i >= limit:
-                        yield el
-                        return
-
-            # Evaluate 500 images
-            nb_epochs = 500 / self.batch_size['train']
 
             for dset_name in self.dsets_names:
                 assert self.paths['dsets'][dset_name].stem == dset_name, "Dataset not corresponding to the path"
                 # At least for the moment, use loss
                 assert self.opt_metrics['bootstrap'] == 'loss'
-
-
 
                 # Test model
                 print(f">>> {dset_name}")
@@ -1012,7 +1019,6 @@ class Typhon(object):
                     test_data_loader=smaller_data_loader(nb_epochs, self.bootstrap_data_loaders[dset_name]))
                     # test_data_loader=self.bootstrap_data_loaders[dset_name])
                     # test_data_loader=self.validation_data_loaders[dset_name]) # Use only validation, to be faster (dsets are already generated with the purpose of having different images)
-
 
                 current[dset_name] = metrics_test
 
@@ -1030,10 +1036,10 @@ class Typhon(object):
             opt_metrics = [current[dset_name][self.opt_metrics['bootstrap']] for dset_name in self.dsets_names]
             best_metrics = [best[dset_name][self.opt_metrics['bootstrap']] for dset_name in self.dsets_names]
 
-            if sum(opt_metrics) > sum(best_metrics):
+            if sum(opt_metrics) < sum(best_metrics):
                 best = current
                 for dset_name in self.dsets_names:
-                    print(f">>> New {self.opt_metrics['bootstrap']} score for {dset_name}: {best[dset_name][self.opt_metrics['bootstrap']]}")
+                    print(f">>> ep {nmodel}: New {self.opt_metrics['bootstrap']} score for {dset_name}: {best[dset_name][self.opt_metrics['bootstrap']]}")
                 print(f'>>> Sum: {sum(opt_metrics)}')
 
 
