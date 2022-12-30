@@ -20,6 +20,7 @@ class Typhon(object):
             architecture,
             initialization,
             bootstrap_size,
+            bootstrap_images,
             nb_batches_per_epoch,
             nb_epochs,
             lrates,
@@ -41,6 +42,7 @@ class Typhon(object):
         self.architecture = architecture
         self.initialization = initialization
         self.bootstrap_size = bootstrap_size
+        self.bootstrap_images = bootstrap_images
         self.nb_batches_per_epoch = nb_batches_per_epoch
         self.nb_epochs = nb_epochs
         self.lrates = lrates
@@ -988,9 +990,12 @@ class Typhon(object):
                 if i >= limit:
                     yield el
                     return
+                else:
+                    yield el
 
-        # Evaluate 500 images
-        nb_epochs = 250 / self.batch_size['train']
+        # Evaluate 250 images
+        nb_epochs = int(self.bootstrap_images / self.batch_size['train'])
+        assert nb_epochs > 0, f'bootstrap_images ({self.bootstrap_images}) must be >= of training batch size ({self.batch_size["train"]})!'
 
         for nmodel in tqdm(range(self.bootstrap_size)):
             # Take the dropouts of the training (no impact since we only test)

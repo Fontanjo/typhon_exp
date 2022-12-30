@@ -76,7 +76,8 @@ class Experiment:
             'architecture' : self.cfg['architecture'],
             'initialization' : self.cfg['initialization'],
             'bootstrap_size' : max(self.cfg['bootstrap_size'], 1),          # Ensure at least 1 for initialization
-            'nb_batches_per_epoch' : self.cfg['nb_batches_per_epoch'],          # TODO: do not test if only 1 (in bootstrap)
+            'bootstrap_images': self.cfg.get('bootstrap_images', 1e10),
+            'nb_batches_per_epoch' : self.cfg['nb_batches_per_epoch'],
             'nb_epochs' : self.cfg['epochs'],
             'lrates' : self.lrates,
             'dropouts' : self.dropouts,
