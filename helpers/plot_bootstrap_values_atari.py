@@ -9,24 +9,36 @@ import mmap
 # FILE_PATH = "./results_atari/20221229_VAE5_bootstrap_QFDa_2/run_logs/221229_1649.log"
 
 # FILE_PATH = "./results_atari/20221229_VAE5_bootstrap_QFDa_2/run_logs/221229_1848.log" # 15k normal
-FILE_PATH = "./results_atari/20221229_VAE5_bootstrap_QFDa_2/run_logs/221229_2230.log" # 50k normal
+# FILE_PATH = "./results_atari/20221229_VAE5_bootstrap_QFDa_2/run_logs/221229_2230.log" # 50k normal
 # FILE_PATH = "./results_atari/20221229_VAE5_nomp_bootstrap_QFDa_1/run_logs/221229_2217.log" # 50k nomp
+
+# FILE_PATH = "./results_atari/20221230_AE6_bootstrap_PDaSi0_0/run_logs/221230_1340.log" # AE6
+FILE_PATH = "./results_atari/20221230_AE6_all2_0/run_logs/221230_2012.log" # AE6
+
+FILE_PATH = "./results_atari/20221231_AE6_all2_0/run_logs/221231_0036.log" # AE6
+
+FILE_PATH = "./results_atari/20221231_AE6_s2_0_3/run_logs/221231_0038.log" # AE6_s2
+
 
 def main():
     vals = []
     ys = []
-    for env_name in ['Qbert', 'Frostbite', 'DemonAttack']:
+    # for env_name in ['Qbert', 'Frostbite', 'DemonAttack']:
+    envs = ['DemonAttack-v5', 'FishingDerby-v5', 'Frostbite-v5', 'Kangaroo-v5', 'NameThisGame-v5', 'Phoenix-v5', 'Qbert-v5', 'Seaquest-v5', 'SpaceInvaders-v5', 'TimePilot-v5', 'testwrong']
+    for env_name in envs:
+        if env_name.endswith('-v5'): env_name = env_name.replace('-v5', '')
         with open(FILE_PATH, 'r+') as f:
             data = mmap.mmap(f.fileno(), 0)
             RE = re.compile(rf'>>> ep (\d*): New loss score for {env_name}-v5: (\d*\.\d*)')
             res = RE.findall(data.read().decode('utf-8')) # Data is bytes-like object, decode into string
 
-        vals.append([env_name, [float(x) for _, x in res]])
-        ys.append([float(y) for y, _ in res])
+        if len(res) > 0:
+            vals.append([env_name, [float(x) for _, x in res]])
+            ys.append([float(y) for y, _ in res])
 
 
 
-    avg = [sum(x) / 3 for x in zip(*[v for n, v in vals])]
+    avg = [sum(x) / len(vals) for x in zip(*[v for n, v in vals])]
 
     # Since all the y are the same, just consider the first list
     ys = ys[0]
@@ -37,6 +49,7 @@ def main():
 
 
     plt.plot(ys, avg, label='AVG', linewidth=5)
+    plt.scatter(ys, avg, label='AVG_new', color='darkred')
     plt.legend()
     plt.show()
 
