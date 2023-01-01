@@ -1047,10 +1047,10 @@ class Typhon(object):
                     print(f">>> ep {nmodel}: New {self.opt_metrics['bootstrap']} score for {dset_name}: {best[dset_name][self.opt_metrics['bootstrap']]}")
                 print(f'>>> Sum: {sum(opt_metrics)}')
 
-            # TODO: For distribution learning purpose, to remove
-            for dset_name in self.dsets_names:
-                print(f">>> ep {nmodel}: {self.opt_metrics['bootstrap']} score for {dset_name}: {best[dset_name][self.opt_metrics['bootstrap']]}")
-            print(f'>>> ep {nmodel} sum: {sum(opt_metrics)}')
+            # # TODO: For distribution learning purpose, to remove
+            # for dset_name in self.dsets_names:
+            #     print(f">>> ep {nmodel}: {self.opt_metrics['bootstrap']} score for {dset_name}: {best[dset_name][self.opt_metrics['bootstrap']]}")
+            # print(f'>>> ep {nmodel} sum: {sum(opt_metrics)}')
 
 
         torch.save(best['model'].to_state_dict(), self.paths['bootstrap_model'])
