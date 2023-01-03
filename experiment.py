@@ -17,6 +17,7 @@ import torch
 from brutelogger import BruteLogger
 import typhon
 import utils
+import copy
 
 
 class Experiment:
@@ -53,8 +54,20 @@ class Experiment:
             self.dropouts[type] =  [self.cfg['dropouts'][type][0], {name:dropout for name, dropout in zip(self.cfg['dsets'], self.cfg['dropouts'][type][1:])}]
         for type in self.cfg['lrates'].keys():
             self.lrates[type] = {name:lrate for name, lrate in zip(self.cfg['dsets'], self.cfg['lrates'][type])}
-        self.optimizers = {name:optim for name, optim in zip(self.cfg['dsets'], self.cfg['optimizers'])}
+
+        # Check if loss is specified for each dset, otherwise copy it
+        assert (len(self.cfg['loss_functions']) == 1 or len(self.cfg['loss_functions']) == len(self.cfg['dsets'])), f"'loss_functions' must be a list with either 1 element, or len(dsets) == {len(self.cfg['dsets'])} elements"
+        if len(self.cfg['loss_functions']) != len(self.cfg['dsets']):
+            print('Copying loss functions')
+            self.cfg['loss_functions'] = [copy.deepcopy(self.cfg['loss_functions'][0]) for _ in self.cfg['dsets']]
         self.loss_functions = {name:fct for name, fct in zip(self.cfg['dsets'], self.cfg['loss_functions'])}
+
+        # Check if optimizer is specified for each dset, otherwise copy it
+        assert (len(self.cfg['optimizers']) == 1 or len(self.cfg['optimizers']) == len(self.cfg['dsets'])), f"'optimizers' must be a list with either 1 element, or len(dsets) == {len(self.cfg['dsets'])} elements"
+        if len(self.cfg['optimizers']) != len(self.cfg['dsets']):
+            print('Copying optimizers')
+            self.cfg['optimizers'] = [copy.deepcopy(self.cfg['optimizers'][0]) for _ in self.cfg['dsets']]
+        self.optimizers = {name:optim for name, optim in zip(self.cfg['dsets'], self.cfg['optimizers'])}
 
         # Give an image size for each dset
         # If not specified, pass None to avoid resizing
