@@ -500,7 +500,7 @@ class VAELossMSE(torch.nn.Module):
         self.mse = torch.nn.MSELoss()
 
     def forward(self, raw_predictions, labels_tensor, mu, logvar):
-        # Compute BCE loss
+        # Compute MSE loss
         mse_loss = self.mse(raw_predictions, labels_tensor)
         # Compute KL-Divergence
         KLD = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
@@ -520,3 +520,21 @@ class VAELossBCE(torch.nn.Module):
         KLD = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
         # Aggregate them (sum)
         return bce_loss + KLD
+
+
+class VAELossBCE_MSE(torch.nn.Module):
+    def __init__(self, weights=[1, 1, 1]):
+        super().__init__()
+        self.bce = torch.nn.BCELoss(reduction='sum')
+        self.mse = torch.nn.MSELoss()
+        self.weights = weights
+
+    def forward(self, raw_predictions, labels_tensor, mu, logvar):
+        # Compute BCE loss
+        bce_loss = self.bce(raw_predictions, labels_tensor)
+        # Compute MSE loss
+        mse_loss = self.mse(raw_predictions, labels_tensor)
+        # Compute KL-Divergence
+        KLD = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
+        # Aggregate them (sum)
+        return self.weights[0] * bce_loss + self.weights[1] * mse_loss + self.weights[2] * KLD
