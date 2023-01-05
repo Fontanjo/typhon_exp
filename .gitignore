@@ -6,4 +6,5 @@ datasets_mini/
 datasets_segmentation/
 datasets_segmentation_not_in_use/
 results/
+results_atari/
 Pipfile.lock
