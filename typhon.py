@@ -417,7 +417,7 @@ class Typhon(object):
 
 
     # type is either 'train', 'spec' or 'bootstrap'
-    def load_data(self, type):
+    def load_data(self, type, classic_loader=False):
         print(f"> Loading data")
 
         if type == 'bootstrap':
@@ -431,7 +431,8 @@ class Typhon(object):
                     batch_size=self.batch_size['train'],
                     cuda_device=self.cuda_device,
                     training_task=self.training_task,
-                    img_dim=self.img_dims[dset_name])
+                    img_dim=self.img_dims[dset_name],
+                    dummy=classic_loader)
 
                 self.bootstrap_data_loaders[dset_name] = bootstrap_loop_loader.data_loader
                 print(f">> Data loaded for dataset {self.paths['dsets'][dset_name]}")
@@ -450,7 +451,8 @@ class Typhon(object):
                     batch_size=self.batch_size[type],
                     cuda_device=self.cuda_device,
                     training_task=self.training_task,
-                    img_dim=self.img_dims[dset_name])
+                    img_dim=self.img_dims[dset_name],
+                    dummy=classic_loader)
 
                 validation_loop_loader = utils.LoopLoader(
                     dset_path=self.paths['dsets'][dset_name],
@@ -458,7 +460,8 @@ class Typhon(object):
                     batch_size=self.batch_size[type],
                     cuda_device=self.cuda_device,
                     training_task=self.training_task,
-                    img_dim=self.img_dims[dset_name])
+                    img_dim=self.img_dims[dset_name],
+                    dummy=classic_loader)
 
                 test_loop_loader = utils.LoopLoader(
                     dset_path=self.paths['dsets'][dset_name],
@@ -466,7 +469,8 @@ class Typhon(object):
                     batch_size=1,  # TODO Why 1??
                     cuda_device=self.cuda_device,
                     training_task=self.training_task,
-                    img_dim=self.img_dims[dset_name])
+                    img_dim=self.img_dims[dset_name],
+                    dummy=classic_loader)
 
                 self.train_loop_loaders[dset_name] = train_loop_loader
                 self.train_data_loaders[dset_name] = train_loop_loader.data_loader
@@ -736,7 +740,7 @@ class Typhon(object):
         # Hydra loops on the datasets in turn
         # and has internal loop for epochs
         utils.print_time("SEQUENTIAL TRAINING")
-        self.load_data('train')
+        self.load_data('train', classic_loader=True)
         self.load_model_and_optims(model_path, 'train')
 
         # For each dataset, Hydra trains on some epochs for all batches
