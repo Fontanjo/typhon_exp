@@ -34,7 +34,8 @@ class Typhon(object):
             batch_size,
             cuda_device,
             resume,
-            img_dims
+            img_dims,
+            remove_mode
         ):
 
         self.paths = paths
@@ -60,6 +61,7 @@ class Typhon(object):
         self.best_models = {}
         self.nb_dataset = len(self.paths['dsets'])
         self.img_dims = img_dims
+        self.remove_mode = remove_mode
         # assert self.nb_dataset == 3, 'Double check as long as we work with 3'
 
 
@@ -432,7 +434,8 @@ class Typhon(object):
                     cuda_device=self.cuda_device,
                     training_task=self.training_task,
                     img_dim=self.img_dims[dset_name],
-                    dummy=classic_loader)
+                    dummy=classic_loader,
+                    remove_mode=self.remove_mode)
 
                 self.bootstrap_data_loaders[dset_name] = bootstrap_loop_loader.data_loader
                 print(f">> Data loaded for dataset {self.paths['dsets'][dset_name]}")
@@ -452,7 +455,8 @@ class Typhon(object):
                     cuda_device=self.cuda_device,
                     training_task=self.training_task,
                     img_dim=self.img_dims[dset_name],
-                    dummy=classic_loader)
+                    dummy=classic_loader,
+                    remove_mode=self.remove_mode)
 
                 validation_loop_loader = utils.LoopLoader(
                     dset_path=self.paths['dsets'][dset_name],
@@ -461,7 +465,8 @@ class Typhon(object):
                     cuda_device=self.cuda_device,
                     training_task=self.training_task,
                     img_dim=self.img_dims[dset_name],
-                    dummy=classic_loader)
+                    dummy=classic_loader,
+                    remove_mode=self.remove_mode)
 
                 test_loop_loader = utils.LoopLoader(
                     dset_path=self.paths['dsets'][dset_name],
@@ -470,7 +475,8 @@ class Typhon(object):
                     cuda_device=self.cuda_device,
                     training_task=self.training_task,
                     img_dim=self.img_dims[dset_name],
-                    dummy=classic_loader)
+                    dummy=classic_loader,
+                    remove_mode=self.remove_mode)
 
                 self.train_loop_loaders[dset_name] = train_loop_loader
                 self.train_data_loaders[dset_name] = train_loop_loader.data_loader
@@ -581,25 +587,6 @@ class Typhon(object):
         data_loader = self.test_data_loaders[dset_name]
         # Load 1 batch
         inputs, labels = next(iter(data_loader)) # Access only 1 batch
-        # Compute mode along width and height (of the original image)
-        # mode = inputs[0][:, :210, :160].mode()[0].mode()[0]
-        # # Expand to match size
-        # mode_tensor = torch.tensor([mode[0], mode[1], mode[2]]).expand(256, 256, 3).transpose(1, 2).transpose(0, 1).to(self.cuda_device)
-        # # Remove mode from inputs (but NOT from labels)
-        # #  We keep mode in the label to have values in [0,1] and be able to use BCE. In any case, the mode can be learned by the
-        # #  dms independently from the input
-        # inputs[:, :, :210, :160] -= mode_tensor[:, :210, :160]
-        #
-        # # Take absolute value (to avoid negative values after removing the mode)
-        # inputs = torch.abs(inputs)
-        #
-        # # Copy modifications to label
-        # # labels = copy.deepcopy(inputs)
-        # labels = inputs.detach().clone()
-        # labels[:, :, :210, :160] -= mode_tensor[:, :210, :160]
-        # labels = torch.abs(labels)
-
-        # inputs, labels = data_loader.get_batch()
         # Pass to model
         outputs = model(inputs, dset_name)
         # Some models (in particular VAEs) returns mu and var together with the output, to compute the loss
@@ -607,23 +594,14 @@ class Typhon(object):
             outputs, mu, var = outputs
         # Convert to numpy
         inp, out, lab = inputs.cpu().detach().numpy(), outputs.cpu().detach().numpy(), labels.cpu().detach().numpy()
-        # # Re-add negative values (if there was any '0' in the original image, this will have -'value of the mode' after removing the mode)
-        # #  Would be better to store the mode when removing it
-        # if self.training_task == 'autoencoding':
-        #     for color_channel in range(len(inp)):
-        #         min_channel = np.min(inp[color_channel])
-        #         inp[color_channel] -= min_channel
-        #         out[color_channel] -= min_channel
-        #         lab[color_channel] -= min_channel
         # Select first image of each batch and move color channel at the end
         inp, out, lab = inp[0].transpose(1, 2, 0), out[0].transpose(1, 2, 0), lab[0].transpose(1, 2, 0)
 
 
-
         # cv2.imwrite(str(self.paths['samples'] / f'ep{epoch}_{dset_name}_input.jpg'), inp * 255)
-        cv2.imwrite(path + f'/ep{epoch}_{dset_name}_input.jpg', inp * 255)
-        cv2.imwrite(path + f'/ep{epoch}_{dset_name}_output.jpg', out * 255)
-        cv2.imwrite(path + f'/ep{epoch}_{dset_name}_label.jpg', lab * 255)
+        cv2.imwrite(path + f'/ep{epoch}_{dset_name}_input.png', inp * 255)
+        cv2.imwrite(path + f'/ep{epoch}_{dset_name}_output.png', out * 255)
+        cv2.imwrite(path + f'/ep{epoch}_{dset_name}_label.png', lab * 255)
 
 
 
@@ -656,7 +634,9 @@ class Typhon(object):
                 print(f">>> Dset {dset_name}")
                 self.model.train()
                 self.train_step(self.model, dset_name, 'some')
-                if epoch % self.metrics_freq['train'] == 0:
+                # Save a first sample, to visualize bootstrap output
+                self.save_sample(path=str(self.paths['samples_training']), model=self.model, dset_name=dset_name, epoch=epoch)
+                if (epoch + 1) % self.metrics_freq['train'] == 0:
                     metrics_training, metrics_validation = self.compute_metrics(self.model, dset_name)
                     # Add training and validation metrics for this epoch
                     print(f">>> Aggregating metrics and saving")
@@ -704,7 +684,9 @@ class Typhon(object):
                 print(f">>> Epoch {epoch}")
                 self.spec_models[dset_name].train()
                 self.train_step(self.spec_models[dset_name], dset_name, 'all')
-                if epoch % self.metrics_freq['spec'] == 0:
+                # Save a first sample, to visualize bootstrap output
+                self.save_sample(path=str(self.paths['samples_training']), model=self.model, dset_name=dset_name, epoch=epoch)
+                if (epoch + 1) % self.metrics_freq['train'] == 0:
                     metrics_training, metrics_validation = self.compute_metrics(self.model, dset_name)
                     print(f">>> Aggregating metrics")
                     self.aggregate_metrics(metrics_training, 'train', dset_name, epoch, 'specialized', 'unfrozen')
@@ -773,15 +755,18 @@ class Typhon(object):
                     if feature_extractor == 'frozen': self.model.freeze_fe()
                     if feature_extractor == 'unfrozen': self.model.unfreeze_fe()
                     self.train_step(self.model, dset_name, 'all')
-                    metrics_training, metrics_validation = self.compute_metrics(self.model, dset_name)
-                    # Add training and validation metrics for this epoch
-                    print(f">>>> Aggregating metrics")
-                    self.aggregate_metrics(metrics_training, 'train', dset_name, epoch, 'trained', feature_extractor)
-                    self.aggregate_metrics(metrics_validation, 'validation', dset_name, epoch, 'trained', feature_extractor)
-                    print(f">>> {self.opt_metrics['train']} train: {metrics_training[self.opt_metrics['train']]} ")
-                    print(f">>> {self.opt_metrics['train']} val: {metrics_validation[self.opt_metrics['train']]} ")
-                    # Save a sample
+                    # Save a first sample, to visualize bootstrap output
                     self.save_sample(path=str(self.paths['samples_training']), model=self.model, dset_name=dset_name, epoch=epoch)
+                    if (epoch + 1) % self.metrics_freq['train'] == 0:
+                        metrics_training, metrics_validation = self.compute_metrics(self.model, dset_name)
+                        # Add training and validation metrics for this epoch
+                        print(f">>>> Aggregating metrics")
+                        self.aggregate_metrics(metrics_training, 'train', dset_name, epoch, 'trained', feature_extractor)
+                        self.aggregate_metrics(metrics_validation, 'validation', dset_name, epoch, 'trained', feature_extractor)
+                        print(f">>> {self.opt_metrics['train']} train: {metrics_training[self.opt_metrics['train']]} ")
+                        print(f">>> {self.opt_metrics['train']} val: {metrics_validation[self.opt_metrics['train']]} ")
+                        # Save a sample
+                        self.save_sample(path=str(self.paths['samples_training']), model=self.model, dset_name=dset_name, epoch=epoch)
                     if (feature_extractor == 'unfrozen') and (idx == 0):
                         # Save also the very first base model, after the "normal training"
                         self.compare_models(
@@ -845,12 +830,15 @@ class Typhon(object):
                 if feature_extractor == 'frozen': self.spec_models[dset_name].freeze_fe()
                 if feature_extractor == 'unfrozen': self.spec_models[dset_name].unfreeze_fe()
                 self.train_step(self.spec_models[dset_name], dset_name, 'all')
-                metrics_training, metrics_validation = self.compute_metrics(self.model, dset_name)
-                print(f">>> Aggregating metrics")
-                self.aggregate_metrics(metrics_training, 'train', dset_name, epoch, 'specialized', feature_extractor)
-                self.aggregate_metrics(metrics_validation, 'validation', dset_name, epoch, 'specialized', feature_extractor)
-                # Save a sample
-                self.save_sample(path=str(self.paths['samples_spec']), model=self.model, dset_name=dset_name, epoch=epoch)
+                # Save a first sample, to visualize bootstrap output
+                self.save_sample(path=str(self.paths['samples_training']), model=self.model, dset_name=dset_name, epoch=epoch)
+                if (epoch + 1) % self.metrics_freq['train'] == 0:
+                    metrics_training, metrics_validation = self.compute_metrics(self.model, dset_name)
+                    print(f">>> Aggregating metrics")
+                    self.aggregate_metrics(metrics_training, 'train', dset_name, epoch, 'specialized', feature_extractor)
+                    self.aggregate_metrics(metrics_validation, 'validation', dset_name, epoch, 'specialized', feature_extractor)
+                    # Save a sample
+                    self.save_sample(path=str(self.paths['samples_spec']), model=self.model, dset_name=dset_name, epoch=ep)
 
                 self.compare_models(
                     model=self.spec_models[dset_name],
