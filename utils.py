@@ -28,7 +28,6 @@ class SegmentationDatasetFolder(torchvision.datasets.DatasetFolder):
         img = self.loader(img_path)
         img_mask = self.loader(img_mask_path)
         # Ensure the sizes are correct
-        # ary = np.pad(ary, [(0, dim[0]), (0, dim[1])])[:dim[0], :dim[1]]
         if self.img_dim is not None:
             # Second argument in torch padding requires the size to add "before last dimension", "after last dimension", "before second-to-last dimension", ...
             img = torch.nn.functional.pad(img, (0, self.img_dim[1], 0, self.img_dim[0]), 'constant', 0)[:, :self.img_dim[0], :self.img_dim[1]]
@@ -38,7 +37,7 @@ class SegmentationDatasetFolder(torchvision.datasets.DatasetFolder):
 
 
 class AutoencodingDatasetFolder(torchvision.datasets.DatasetFolder):
-    def __init__(self, loader, path, cuda_device='cpu', img_dim=None):
+    def __init__(self, loader, path, cuda_device='cpu', img_dim=None, remove_mode=True):
         self.loader = loader
         self.cuda_device = cuda_device
         self.imgs_path = path
@@ -48,7 +47,9 @@ class AutoencodingDatasetFolder(torchvision.datasets.DatasetFolder):
             self.data.append(img)
         self.img_dim = img_dim
         self.num_samples = len(self.data)
-        self.mode_img = self.get_dset_mode(100)
+        self.remove_mode = remove_mode
+        if self.remove_mode:
+            self.mode_img = self.get_dset_mode(100)
 
     def __len__(self):
         return len(self.data)
@@ -60,9 +61,10 @@ class AutoencodingDatasetFolder(torchvision.datasets.DatasetFolder):
         if self.img_dim is not None:
             # Second argument in torch padding requires the size to add "before last dimension", "after last dimension", "before second-to-last dimension", ...
             img = torch.nn.functional.pad(img, (0, self.img_dim[1], 0, self.img_dim[0]), 'constant', 0)[:, :self.img_dim[0], :self.img_dim[1]]
-        # Remove mode image
-        img -= self.mode_img
-        img = torch.abs(img)
+        if self.remove_mode:
+            # Remove mode image
+            img -= self.mode_img
+            img = torch.abs(img)
         # Return img as input and as label
         return img, img
 
@@ -98,7 +100,8 @@ class LoopLoader():
             cuda_device,
             training_task='classification',
             img_dim=(256,256),
-            dummy=False # If we need a stardard loader, this deactivate the reshuffling
+            dummy=False, # If we need a stardard loader, this deactivate the reshuffling
+            remove_mode=True
         ):
 
         self.dset_path = dset_path
@@ -108,6 +111,7 @@ class LoopLoader():
         self.training_task = training_task
         self.img_dim = img_dim
         self.dummy = dummy
+        self.remove_mode = remove_mode
 
         if self.training_task == 'classification':
             # For a list of which, we concatenate
@@ -128,7 +132,8 @@ class LoopLoader():
                 path=f"{dset_path}/{split}/",
                 cuda_device=self.cuda_device,
                 loader=autoencoding_loader(self.cuda_device),
-                img_dim=self.img_dim)
+                img_dim=self.img_dim,
+                remove_mode=self.remove_mode)
                 for split in which])
         else:
             raise UnrecognizedTaskError("Task is not valid, should be in ['classification', 'segmentation', 'autoencoding']")

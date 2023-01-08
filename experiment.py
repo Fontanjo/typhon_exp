@@ -103,7 +103,8 @@ class Experiment:
             'mu_var_loss': self.cfg['mu_var_loss'],
             'cuda_device' : self.cuda_device,
             'resume' : self.cfg['resume'],
-            'img_dims' : self.img_dims
+            'img_dims' : self.img_dims,
+            'remove_mode': self.cfg['remove_mode']
         }
 
         print(f"> Config loaded successfully for {self.cfg['transfer']} training:")
