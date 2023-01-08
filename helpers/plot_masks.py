@@ -67,7 +67,7 @@ if __name__ == "__main__":
 
 
 	# data is your numpy array with shape (617, 767)
-	orig_img = Image.fromarray(npinput.dot([0.299, 0.587, 0.114]) * 255) # For some reason can't show as colored mri, show as grayscale # TODO fix
+	orig_img = Image.fromarray(npinput.dot([0.299, 0.587, 0.114]) * 255) # For some reason can't show as colored mri, show as grayscale 
 	out_img = Image.fromarray(npoutput * 255)
 	mask_img = Image.fromarray(npmask * 255)
 

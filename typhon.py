@@ -280,30 +280,6 @@ class Typhon(object):
 
             input, labels = inputs.to(self.cuda_device), labels.to(self.cuda_device)
 
-            # mode = inputs.mode(dim=0)[0].mode()[0].mode()[0]
-            # Compute mode of first image of the batch, withouth considering the padding
-            # TODO remove hardcoded :210, :160
-            # mode = inputs[0][:, :210, :160].mode()[0].mode()[0]
-            # # Expand to match size
-            # mode_tensor = torch.tensor([mode[0], mode[1], mode[2]]).expand(256, 256, 3).transpose(1, 2).transpose(0, 1).to(self.cuda_device)
-            # # Remove mode from inputs (but NOT from labels)
-            # #  We keep mode in the label to have values in [0,1] and be able to use BCE. In any case, the mode can be learned by the
-            # #  dms independently from the input
-            # inputs_unmoded = inputs
-            # inputs_unmoded[:, :, :210, :160] -= mode_tensor[:, :210, :160]
-            #
-            # # Take absolute value (to avoid negative values after removing the mode)
-            # inputs_unmoded = torch.abs(inputs_unmoded)
-            #
-            # # Copy modifications to label
-            # # labels = copy.deepcopy(inputs_unmoded)
-            # labels = inputs_unmoded.detach().clone()
-            # labels[:, :, :210, :160] -= mode_tensor[:, :210, :160]
-            # labels = torch.abs(labels)
-
-            # Send data to GPU if available
-            # inputs_unmoded, labels = inputs_unmoded.to(self.cuda_device), labels.to(self.cuda_device)
-
             # Feed the model and get outputs
             # Raw, unnormalized output required to compute the loss (with CrossEntropyLoss)
             outputs = model(inputs, dset_name)
@@ -325,32 +301,7 @@ class Typhon(object):
                 ls = self.loss_functions[dset_name](raw_predictions, labels_tensor).item()
             losses.append(ls)
 
-            # # Compute auc
-            # labels_list = labels.flatten().cpu().numpy().tolist()
-            # positive_pred_list = outputs.flatten().cpu().numpy().tolist()
-            # try:
-            #     auc = sklearn.metrics.roc_auc_score(labels_list, positive_pred_list).item()
-            #     # print(f'AUC = {auc}')
-            # except ValueError:
-            #     # print('Only one class present in y_true. ROC AUC score is not defined in that case.')
-            #     # print('Saving AUC as 0')
-            #     auc = 0
-            # aucs.append(auc)
-            #
-            # # Set the values of the output to 0 or 1 (tumor at pixel xy or not) and cast to int
-            # predicted = (outputs > 0.5).int()
-            # labels = labels.int()
-            #
-            # # TODO check efficiency and possibly find a better way
-            # tp = torch.sum((predicted==labels) * (predicted==1)).item()
-            # tn = torch.sum((predicted==labels) * (predicted==0)).item()
-            # fp = torch.sum((predicted!=labels) * (predicted==1)).item()
-            # fn = torch.sum((predicted!=labels) * (predicted==0)).item()
-            #
-            # conf_matrix_per_batch = {'TP': tp, 'FP': fp, 'TN': tn, 'FN': fn}
-            #
-            # for key, value in conf_matrix_per_batch.items():
-            #     confusion_matrix_dict.setdefault(key, []).append(value)
+
 
         end = time.perf_counter()
 
@@ -471,7 +422,7 @@ class Typhon(object):
                 test_loop_loader = utils.LoopLoader(
                     dset_path=self.paths['dsets'][dset_name],
                     which=['test'],
-                    batch_size=1,  # TODO Why 1??
+                    batch_size=1,
                     cuda_device=self.cuda_device,
                     training_task=self.training_task,
                     img_dim=self.img_dims[dset_name],
@@ -1003,6 +954,7 @@ class Typhon(object):
             current = {dset:{} for dset in self.dsets_names}
             current['model'] = model
 
+            # TODO: allow to use only some dsets in bootstrap, possibly with weights
             for dset_name in self.dsets_names:
                 assert self.paths['dsets'][dset_name].stem == dset_name, "Dataset not corresponding to the path"
                 # At least for the moment, use loss
@@ -1039,7 +991,7 @@ class Typhon(object):
                     print(f">>> ep {nmodel}: New {self.opt_metrics['bootstrap']} score for {dset_name}: {best[dset_name][self.opt_metrics['bootstrap']]}")
                 print(f'>>> Sum: {sum(opt_metrics)}')
 
-            # # TODO: For distribution learning purpose, to remove
+            # For distribution learning purpose, comment otherwise
             # for dset_name in self.dsets_names:
             #     print(f">>> ep {nmodel}: {self.opt_metrics['bootstrap']} score for {dset_name}: {best[dset_name][self.opt_metrics['bootstrap']]}")
             # print(f'>>> ep {nmodel} sum: {sum(opt_metrics)}')
