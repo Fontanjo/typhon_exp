@@ -18,7 +18,7 @@ cfg = {
     'trg_gpu' : sys.argv[-1] if not (sys.argv[-1].endswith('.py') or sys.argv[-1].startswith('-')) else Path(__file__).stem.split('_')[-1],
     'trg_n_cpu' : 8, # how many CPU threads to use
     # Datasets
-    'dsets' : ['Phoenix-v5', 'Kangaroo-v5'],
+    'dsets' : ['Phoenix-v5', 'Qbert-v5'],
     'trg_dset' : 'Phoenix-v5',
     # Pad and crop to get specific dimension
     # One for each dset, or just one if same for all. None to leave as it is
@@ -49,10 +49,10 @@ cfg = {
     # Only for training, since in specialization it trains on all batches
     'nb_batches_per_epoch' : 1,
     'epochs' : {
-        'train' : 100000,
+        'train' : 300000,
         'spec' : 0,
     },
-    'architecture' : 'AE8c',
+    'architecture' : 'AE8f',
     # Only for autoencoding. Some loss functions requires mu and logvar as well (in particular for VAEs)
     #  In these cases, make sure the dm returns 3 objects (output, mu, logvar)
     'mu_var_loss': False,
@@ -68,7 +68,7 @@ cfg = {
     },
     # Frequency of metrics collection during training ans specialization
     'metrics_freq' : {
-        'train': 1000,
+        'train': 3000,
         'spec': 10,
     },
     # Training task (classification / segmentation / autoencoding)

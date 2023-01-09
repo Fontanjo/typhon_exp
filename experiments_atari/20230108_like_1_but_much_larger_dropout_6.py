@@ -123,9 +123,12 @@ if __name__ == '__main__':
                     new_cfg[metric] = [cfg[metric][i]]
             for metric in ['train', 'spec', 'frozen']:
                 if type(cfg['lrates'][metric] == list and len(cfg['lrates'][metric]) > 1):
-                    new_cfg['lrates'][metric] = [cfg['lrates'][metric][i]]
+                    # Copy only if there is a specific value for each dset
+                    if len(cfg['lrates'][metric]) == len(cfg['dsets']):
+                        new_cfg['lrates'][metric] = [cfg['lrates'][metric][i]]
                 if type(cfg['dropouts'][metric] == list and len(cfg['dropouts'][metric]) > 1):
-                    new_cfg['dropouts'][metric] = [cfg['dropouts'][metric][0], cfg['dropouts'][metric][i+1]] # Copy dropout for fe as well
+                    if len(cfg['lrates'][metric]) == len(cfg['dsets']) + 1:
+                        new_cfg['dropouts'][metric] = [cfg['dropouts'][metric][0], cfg['dropouts'][metric][i+1]] # Copy dropout for fe as well
             # Change the output path
             new_cfg['out_path'] = f'{cfg["out_path"]}/baselines/{env}'
             # # Put a flag for Experiment, which will create different paths

@@ -49,7 +49,7 @@ cfg = {
     # Only for training, since in specialization it trains on all batches
     'nb_batches_per_epoch' : 1,
     'epochs' : {
-        'train' : 100000,
+        'train' : 150,
         'spec' : 0,
     },
     'architecture' : 'AE8c',
@@ -68,7 +68,7 @@ cfg = {
     },
     # Frequency of metrics collection during training ans specialization
     'metrics_freq' : {
-        'train': 1000,
+        'train': 1,
         'spec': 10,
     },
     # Training task (classification / segmentation / autoencoding)
@@ -123,9 +123,12 @@ if __name__ == '__main__':
                     new_cfg[metric] = [cfg[metric][i]]
             for metric in ['train', 'spec', 'frozen']:
                 if type(cfg['lrates'][metric] == list and len(cfg['lrates'][metric]) > 1):
-                    new_cfg['lrates'][metric] = [cfg['lrates'][metric][i]]
+                    # Copy only if there is a specific value for each dset
+                    if len(cfg['lrates'][metric]) == len(cfg['dsets']):
+                        new_cfg['lrates'][metric] = [cfg['lrates'][metric][i]]
                 if type(cfg['dropouts'][metric] == list and len(cfg['dropouts'][metric]) > 1):
-                    new_cfg['dropouts'][metric] = [cfg['dropouts'][metric][0], cfg['dropouts'][metric][i+1]] # Copy dropout for fe as well
+                    if len(cfg['lrates'][metric]) == len(cfg['dsets']) + 1:
+                        new_cfg['dropouts'][metric] = [cfg['dropouts'][metric][0], cfg['dropouts'][metric][i+1]] # Copy dropout for fe as well
             # Change the output path
             new_cfg['out_path'] = f'{cfg["out_path"]}/baselines/{env}'
             # # Put a flag for Experiment, which will create different paths

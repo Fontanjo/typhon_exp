@@ -18,7 +18,7 @@ cfg = {
     'trg_gpu' : sys.argv[-1] if not (sys.argv[-1].endswith('.py') or sys.argv[-1].startswith('-')) else Path(__file__).stem.split('_')[-1],
     'trg_n_cpu' : 8, # how many CPU threads to use
     # Datasets
-    'dsets' : ['Phoenix-v5', 'Kangaroo-v5'],
+    'dsets' : ['Phoenix-v5', 'Qbert-v5'],
     'trg_dset' : 'Phoenix-v5',
     # Pad and crop to get specific dimension
     # One for each dset, or just one if same for all. None to leave as it is
@@ -31,14 +31,14 @@ cfg = {
     # Hyperparams
     'lrates' : {
         # One per each DMs
-        'train' : [5e-5, 5e-5],
+        'train' : [5e-6, 5e-6],
         'spec' : [1e-5, 1e-5],
         # Frozen is for sequential train only, when training with frozen feature extractor
         'frozen' : [1e-3, 1e-3],
     },
     'dropouts' : {
         # First one for the FE, following for the DMs
-        'train' : [0.1, 0.1, 0.1],
+        'train' : [0.15, 0.15, 0.15],
         'spec' : [0., 0., 0.],
         'frozen' : [0., 0., 0.],
     },

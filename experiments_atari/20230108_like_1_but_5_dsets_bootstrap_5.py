@@ -18,7 +18,7 @@ cfg = {
     'trg_gpu' : sys.argv[-1] if not (sys.argv[-1].endswith('.py') or sys.argv[-1].startswith('-')) else Path(__file__).stem.split('_')[-1],
     'trg_n_cpu' : 8, # how many CPU threads to use
     # Datasets
-    'dsets' : ['Phoenix-v5', 'Kangaroo-v5'],
+    'dsets' : ['Phoenix-v5', 'Qbert-v5', 'DemonAttack-v5', 'Seaquest-v5', 'Kangaroo-v5'],
     'trg_dset' : 'Phoenix-v5',
     # Pad and crop to get specific dimension
     # One for each dset, or just one if same for all. None to leave as it is
@@ -31,16 +31,16 @@ cfg = {
     # Hyperparams
     'lrates' : {
         # One per each DMs
-        'train' : [5e-5, 5e-5],
-        'spec' : [1e-5, 1e-5],
+        'train' : [5e-5, 5e-5, 5e-5, 5e-5, 5e-5],
+        'spec' : [1e-5, 1e-5, 1e-5, 1e-5, 1e-5],
         # Frozen is for sequential train only, when training with frozen feature extractor
-        'frozen' : [1e-3, 1e-3],
+        'frozen' : [1e-3, 1e-3, 1e-3, 1e-3, 1e-3],
     },
     'dropouts' : {
         # First one for the FE, following for the DMs
-        'train' : [0.1, 0.1, 0.1],
-        'spec' : [0., 0., 0.],
-        'frozen' : [0., 0., 0.],
+        'train' : [0.1, 0.1, 0.1, 0.1, 0.1, 0.1],
+        'spec' : [0., 0., 0., 0., 0., 0.],
+        'frozen' : [0., 0., 0., 0., 0., 0.],
     },
     'batch_size' : {
         'train' : 8,
@@ -49,7 +49,7 @@ cfg = {
     # Only for training, since in specialization it trains on all batches
     'nb_batches_per_epoch' : 1,
     'epochs' : {
-        'train' : 100000,
+        'train' : 200000,
         'spec' : 0,
     },
     'architecture' : 'AE8c',
@@ -57,9 +57,9 @@ cfg = {
     #  In these cases, make sure the dm returns 3 objects (output, mu, logvar)
     'mu_var_loss': False,
     # One per each DMs
-    'loss_functions' : [torch.nn.MSELoss(), torch.nn.MSELoss()],
+    'loss_functions' : [torch.nn.MSELoss(), torch.nn.MSELoss(), torch.nn.MSELoss(), torch.nn.MSELoss(), torch.nn.MSELoss()],
     # One per each DMs
-    'optimizers' : [torch.optim.Adam, torch.optim.Adam],
+    'optimizers' : [torch.optim.Adam, torch.optim.Adam, torch.optim.Adam, torch.optim.Adam, torch.optim.Adam],
     # Metrics used to compare models, i.e. which one is the best
     'opt_metrics' : {
         'bootstrap' : 'loss',
@@ -68,7 +68,7 @@ cfg = {
     },
     # Frequency of metrics collection during training ans specialization
     'metrics_freq' : {
-        'train': 1000,
+        'train': 2000,
         'spec': 10,
     },
     # Training task (classification / segmentation / autoencoding)
@@ -78,9 +78,9 @@ cfg = {
     'ramdir'     : '/dev/shm', # copying data to RAM once to speed it up
     'out_path' : 'results_atari',
     # Type of initialization. Either 'bootstrap', 'random' or 'load'
-    'initialization': 'random',
+    'initialization': 'bootstrap',
     # Number of models to tes tin bootstrap. Ignored if 'initialization' is not 'bootstrap'
-    'bootstrap_size' : 0,
+    'bootstrap_size' : 2000,
     # Number of images to test in bootstrap. In any case at most |training_dset| + |validation_dset|
     #  For now only implemented for training_task autoencoding
     'bootstrap_images': 160,
