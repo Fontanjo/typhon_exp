@@ -195,6 +195,9 @@ class Experiment:
         # Copy the experiment.py and exp cfg file in the experiment dir
         shutil.copy2(self.cfg['exp_file'], self.paths['experiment'])
         shutil.copy2('experiment.py', self.paths['experiment'])
+        # Copy architectures as well
+        shutil.copy2('architectures/' + self.cfg['architecture'] + '_fe.py', self.paths['experiment'])
+        shutil.copy2('architectures/' + self.cfg['architecture'] + '_dm.py', self.paths['experiment'])
 
         self.typhon = typhon.Typhon(**self.train_args)
         # Bootstrap initialization
