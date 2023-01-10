@@ -2,10 +2,10 @@ import torch.nn as nn
 
 def get_block(dropout, in_channels=1):
     return nn.Sequential(
-        nn.Linear(512, 512),
-        nn.ELU(),
+        # nn.Linear(512, 512),
+        # nn.ELU(),
 
-        nn.Linear(512, 52*40),
+        nn.Linear(128, 52*40),
         nn.ELU(),
 
         nn.Unflatten(1, (1, 52, 40)),

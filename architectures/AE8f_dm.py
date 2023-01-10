@@ -2,10 +2,6 @@ import torch.nn as nn
 
 def get_block(dropout, in_channels=1):
     return nn.Sequential(
-        nn.Linear(512, 512),
-        nn.ELU(),
-        nn.Dropout(p=dropout),
-
         nn.Linear(512, 52*40),
         nn.ELU(),
         nn.Dropout(p=dropout),

@@ -18,7 +18,7 @@ cfg = {
     'trg_gpu' : sys.argv[-1] if not (sys.argv[-1].endswith('.py') or sys.argv[-1].startswith('-')) else Path(__file__).stem.split('_')[-1],
     'trg_n_cpu' : 8, # how many CPU threads to use
     # Datasets
-    'dsets' : ['Phoenix-v5', 'DemonAttack-v5'],
+    'dsets' : ['Phoenix-v5', 'Qbert-v5'],
     'trg_dset' : 'Phoenix-v5',
     # Pad and crop to get specific dimension
     # One for each dset, or just one if same for all. None to leave as it is
@@ -31,7 +31,7 @@ cfg = {
     # Hyperparams
     'lrates' : {
         # One per each DMs
-        'train' : [5e-5, 5e-5],
+        'train' : [5e-6, 5e-6],
         'spec' : [1e-5, 1e-5],
         # Frozen is for sequential train only, when training with frozen feature extractor
         'frozen' : [1e-3, 1e-3],
@@ -52,7 +52,7 @@ cfg = {
         'train' : 100000,
         'spec' : 0,
     },
-    'architecture' : 'AE8c',
+    'architecture' : 'AE8c2',
     # Only for autoencoding. Some loss functions requires mu and logvar as well (in particular for VAEs)
     #  In these cases, make sure the dm returns 3 objects (output, mu, logvar)
     'mu_var_loss': False,
@@ -78,9 +78,9 @@ cfg = {
     'ramdir'     : '/dev/shm', # copying data to RAM once to speed it up
     'out_path' : 'results_atari',
     # Type of initialization. Either 'bootstrap', 'random' or 'load'
-    'initialization': 'load', # Already did once
+    'initialization': 'random',
     # Number of models to tes tin bootstrap. Ignored if 'initialization' is not 'bootstrap'
-    'bootstrap_size' : 2000,
+    'bootstrap_size' : 0,
     # Number of images to test in bootstrap. In any case at most |training_dset| + |validation_dset|
     #  For now only implemented for training_task autoencoding
     'bootstrap_images': 160,

@@ -52,12 +52,12 @@ cfg = {
         'train' : 100000,
         'spec' : 0,
     },
-    'architecture' : 'AE8c',
+    'architecture' : 'VAE8d_mv',
     # Only for autoencoding. Some loss functions requires mu and logvar as well (in particular for VAEs)
     #  In these cases, make sure the dm returns 3 objects (output, mu, logvar)
-    'mu_var_loss': False,
+    'mu_var_loss': True,
     # One per each DMs
-    'loss_functions' : [torch.nn.MSELoss(), torch.nn.MSELoss()],
+    'loss_functions' : [VAELossBCE(), VAELossBCE()],
     # One per each DMs
     'optimizers' : [torch.optim.Adam, torch.optim.Adam],
     # Metrics used to compare models, i.e. which one is the best
@@ -78,7 +78,7 @@ cfg = {
     'ramdir'     : '/dev/shm', # copying data to RAM once to speed it up
     'out_path' : 'results_atari',
     # Type of initialization. Either 'bootstrap', 'random' or 'load'
-    'initialization': 'load', # Already did once
+    'initialization': 'bootstrap', # Already did once
     # Number of models to tes tin bootstrap. Ignored if 'initialization' is not 'bootstrap'
     'bootstrap_size' : 2000,
     # Number of images to test in bootstrap. In any case at most |training_dset| + |validation_dset|

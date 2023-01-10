@@ -49,10 +49,10 @@ cfg = {
     # Only for training, since in specialization it trains on all batches
     'nb_batches_per_epoch' : 1,
     'epochs' : {
-        'train' : 100000,
+        'train' : 200000,
         'spec' : 0,
     },
-    'architecture' : 'AE8c',
+    'architecture' : 'AE8g',
     # Only for autoencoding. Some loss functions requires mu and logvar as well (in particular for VAEs)
     #  In these cases, make sure the dm returns 3 objects (output, mu, logvar)
     'mu_var_loss': False,
@@ -68,7 +68,7 @@ cfg = {
     },
     # Frequency of metrics collection during training ans specialization
     'metrics_freq' : {
-        'train': 1000,
+        'train': 2000,
         'spec': 10,
     },
     # Training task (classification / segmentation / autoencoding)
@@ -78,7 +78,7 @@ cfg = {
     'ramdir'     : '/dev/shm', # copying data to RAM once to speed it up
     'out_path' : 'results_atari',
     # Type of initialization. Either 'bootstrap', 'random' or 'load'
-    'initialization': 'load', # Already did once
+    'initialization': 'random',
     # Number of models to tes tin bootstrap. Ignored if 'initialization' is not 'bootstrap'
     'bootstrap_size' : 2000,
     # Number of images to test in bootstrap. In any case at most |training_dset| + |validation_dset|
