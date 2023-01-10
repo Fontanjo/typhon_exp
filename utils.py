@@ -545,3 +545,19 @@ class VAELossBCE_MSE(torch.nn.Module):
         KLD = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
         # Aggregate them (sum)
         return self.weights[0] * bce_loss + self.weights[1] * mse_loss + self.weights[2] * KLD
+
+
+# Count the numer of pixel that diffears (using torch.isclose)
+# default values for relative tolerance (rtol) and absolute tolerance (atol) are those default in the function
+class EqualPixels(torch.nn.Module):
+    def __init__(self, rtol=1e-05, atol=1e-08):
+        super().__init__()
+        self.rtol = rtol
+        self.atol = atol
+
+    def forward(self, raw_predictions, labels_tensor):
+        # Get True/False for each pixel
+        equal_pixels = torch.isclose(raw_predictions, labels_tensor, rtol=self.rtol, atol=self.atol)
+        # Count true values (sum)
+        sm = torch.sum(equal_pixels)
+        return sm
