@@ -549,15 +549,76 @@ class VAELossBCE_MSE(torch.nn.Module):
 
 # Count the numer of pixel that diffears (using torch.isclose)
 # default values for relative tolerance (rtol) and absolute tolerance (atol) are those default in the function
+#  -> Not differentiable!
+# Ignore small differences
 class EqualPixels(torch.nn.Module):
-    def __init__(self, rtol=1e-05, atol=1e-08):
+    # def __init__(self, rtol=1e-05, atol=1e-08):
+    def __init__(self, lambd=0.2):
         super().__init__()
-        self.rtol = rtol
-        self.atol = atol
+        self.lambd = lambd
+        self.remove_small = torch.nn.Hardshrink(lambd=self.lambd)
+        # self.rtol = rtol
+        # self.atol = atol
 
     def forward(self, raw_predictions, labels_tensor):
-        # Get True/False for each pixel
-        equal_pixels = torch.isclose(raw_predictions, labels_tensor, rtol=self.rtol, atol=self.atol)
-        # Count true values (sum)
-        sm = torch.sum(equal_pixels)
-        return sm
+        diff = torch.subtract(raw_predictions, labels_tensor)
+        # Remove small values
+        hsr_diff = self.remove_small(diff)
+        # Get all positive values, with abs
+        pos_diff = torch.abs(hsr_diff)
+        # Sum
+        return torch.sum(pos_diff)
+        # # Get True/False for each pixel
+        # equal_pixels = torch.isclose(raw_predictions, labels_tensor, rtol=self.rtol, atol=self.atol)
+        # # equal_pixels = torch.eq(raw_predictions, labels_tensor)
+        # # Count true values (sum)
+        # sm = torch.sum(equal_pixels)
+        # return sm
+
+
+class EqualPixels1(torch.nn.Module):
+    # def __init__(self, rtol=1e-05, atol=1e-08):
+    def __init__(self, lambd=0.2):
+        super().__init__()
+        self.lambd = lambd
+        self.remove_small = torch.nn.Hardshrink(lambd=self.lambd)
+
+
+    def forward(self, raw_predictions, labels_tensor):
+        diff = torch.subtract(raw_predictions, labels_tensor)
+        # Remove small values
+        hsr_diff = self.remove_small(diff)
+        # Get all positive values, by squaring
+        pos_diff = torch.square(hsr_diff)
+        # Sum
+        return torch.sum(pos_diff)
+        # # Get True/False for each pixel
+        # equal_pixels = torch.isclose(raw_predictions, labels_tensor, rtol=self.rtol, atol=self.atol)
+        # # equal_pixels = torch.eq(raw_predictions, labels_tensor)
+        # # Count true values (sum)
+        # sm = torch.sum(equal_pixels)
+        # return sm
+
+
+class EqualPixels2(torch.nn.Module):
+    # def __init__(self, rtol=1e-05, atol=1e-08):
+    def __init__(self, lambd=0.1, factor=10):
+        super().__init__()
+        self.factor = factor
+        self.lambd = lambd
+        self.remove_small = torch.nn.Hardshrink(lambd=self.lambd)
+        self.to_one = torch.nn.Tanh()
+        # self.rtol = rtol
+        # self.atol = atol
+
+    def forward(self, raw_predictions, labels_tensor):
+        diff = torch.subtract(raw_predictions, labels_tensor)
+        # Remove small values
+        hsr_diff = self.remove_small(diff)
+        # Get all positie values
+        pos_diff = torch.abs(hsr_diff)
+        # Push to 1 values that are (now) not 0
+        pos_diff = torch.multiply(pos_diff, self.factor)
+        pos_diff = self.to_one(pos_diff)
+        # Sum
+        return torch.sum(pos_diff)
