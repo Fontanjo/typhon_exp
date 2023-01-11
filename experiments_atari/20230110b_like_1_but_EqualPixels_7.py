@@ -119,7 +119,7 @@ if __name__ == '__main__':
             # Get correct working size, lrate, dropout, loss and optimizer
             for metric in ['working_sizes', 'loss_functions', 'optimizers']:
                 # Need to do something only if the values are specific for each dset
-                if type(cfg[metric] == list and len(cfg[metric]) > 1):
+                if (type(cfg[metric]) == list and len(cfg[metric]) > 1):
                     new_cfg[metric] = [cfg[metric][i]]
             for metric in ['train', 'spec', 'frozen']:
                 if type(cfg['lrates'][metric] == list and len(cfg['lrates'][metric]) > 1):

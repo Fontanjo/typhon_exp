@@ -43,16 +43,16 @@ cfg = {
         'frozen' : [0., 0., 0.],
     },
     'batch_size' : {
-        'train' : 64,
+        'train' : 8,
         'spec' : 64,
     },
     # Only for training, since in specialization it trains on all batches
     'nb_batches_per_epoch' : 1,
     'epochs' : {
-        'train' : 160, # 100'000 * 8 / 5'000, see same nb of images as original
+        'train' : 200000,
         'spec' : 0,
     },
-    'architecture' : 'AE8c',
+    'architecture' : 'AE8c3',
     # Only for autoencoding. Some loss functions requires mu and logvar as well (in particular for VAEs)
     #  In these cases, make sure the dm returns 3 objects (output, mu, logvar)
     'mu_var_loss': False,
@@ -68,7 +68,7 @@ cfg = {
     },
     # Frequency of metrics collection during training ans specialization
     'metrics_freq' : {
-        'train': 1,
+        'train': 2000,
         'spec': 10,
     },
     # Training task (classification / segmentation / autoencoding)

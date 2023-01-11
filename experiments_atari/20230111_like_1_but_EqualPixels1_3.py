@@ -10,7 +10,7 @@ import utils
 import argparse
 import copy
 import time
-from utils import VAELossMSE, VAELossBCE, VAELossBCE_MSE
+from utils import VAELossMSE, VAELossBCE, VAELossBCE_MSE, EqualPixels1
 
 
 cfg = {
@@ -43,13 +43,13 @@ cfg = {
         'frozen' : [0., 0., 0.],
     },
     'batch_size' : {
-        'train' : 64,
+        'train' : 8,
         'spec' : 64,
     },
     # Only for training, since in specialization it trains on all batches
     'nb_batches_per_epoch' : 1,
     'epochs' : {
-        'train' : 160, # 100'000 * 8 / 5'000, see same nb of images as original
+        'train' : 100000,
         'spec' : 0,
     },
     'architecture' : 'AE8c',
@@ -57,9 +57,9 @@ cfg = {
     #  In these cases, make sure the dm returns 3 objects (output, mu, logvar)
     'mu_var_loss': False,
     # One per each DMs
-    'loss_functions' : [torch.nn.MSELoss(), torch.nn.MSELoss()],
+    'loss_functions' : [EqualPixels1(lambd=0.01)],
     # One per each DMs
-    'optimizers' : [torch.optim.Adam, torch.optim.Adam],
+    'optimizers' : [torch.optim.Adam],
     # Metrics used to compare models, i.e. which one is the best
     'opt_metrics' : {
         'bootstrap' : 'loss',
@@ -68,7 +68,7 @@ cfg = {
     },
     # Frequency of metrics collection during training ans specialization
     'metrics_freq' : {
-        'train': 1,
+        'train': 1000,
         'spec': 10,
     },
     # Training task (classification / segmentation / autoencoding)

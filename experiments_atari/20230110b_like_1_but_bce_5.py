@@ -49,7 +49,7 @@ cfg = {
     # Only for training, since in specialization it trains on all batches
     'nb_batches_per_epoch' : 1,
     'epochs' : {
-        'train' : 100000,
+        'train' : 200000,
         'spec' : 0,
     },
     'architecture' : 'AE8c',
@@ -68,7 +68,7 @@ cfg = {
     },
     # Frequency of metrics collection during training ans specialization
     'metrics_freq' : {
-        'train': 1000,
+        'train': 2000,
         'spec': 10,
     },
     # Training task (classification / segmentation / autoencoding)
@@ -119,7 +119,7 @@ if __name__ == '__main__':
             # Get correct working size, lrate, dropout, loss and optimizer
             for metric in ['working_sizes', 'loss_functions', 'optimizers']:
                 # Need to do something only if the values are specific for each dset
-                if type(cfg[metric] == list and len(cfg[metric]) > 1):
+                if (type(cfg[metric]) == list and len(cfg[metric]) > 1):
                     new_cfg[metric] = [cfg[metric][i]]
             for metric in ['train', 'spec', 'frozen']:
                 if type(cfg['lrates'][metric] == list and len(cfg['lrates'][metric]) > 1):
