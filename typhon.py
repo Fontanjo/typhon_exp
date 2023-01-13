@@ -578,6 +578,10 @@ class Typhon(object):
             range_epochs = range(start_epoch, start_epoch + self.nb_epochs['train'])
             print(f"> Resuming training from epoch {start_epoch}")
 
+        # Save a first sample, to visualize bootstrap output
+        for dset_name in self.dsets_names:
+            self.save_sample(path=str(self.paths['samples_training']), model=self.model, dset_name=dset_name, epoch=0)
+
         for epoch in tqdm(range_epochs):
             print(f">> Epoch {epoch}")
 
@@ -585,8 +589,6 @@ class Typhon(object):
                 print(f">>> Dset {dset_name}")
                 self.model.train()
                 self.train_step(self.model, dset_name, 'some')
-                # Save a first sample, to visualize bootstrap output
-                self.save_sample(path=str(self.paths['samples_training']), model=self.model, dset_name=dset_name, epoch=epoch)
                 if (epoch + 1) % self.metrics_freq['train'] == 0:
                     metrics_training, metrics_validation = self.compute_metrics(self.model, dset_name)
                     # Add training and validation metrics for this epoch
@@ -627,6 +629,10 @@ class Typhon(object):
         best_spec_dict = {}
         best_spec_models = {}
 
+        # Save a first sample, to visualize bootstrap output
+        for dset_name in self.dsets_names:
+            self.save_sample(path=str(self.paths['samples_training']), model=self.model, dset_name=dset_name, epoch=0)
+
         for dset_name in self.dsets_names:
             utils.print_time(f">> Dataset {dset_name}")
 
@@ -635,8 +641,6 @@ class Typhon(object):
                 print(f">>> Epoch {epoch}")
                 self.spec_models[dset_name].train()
                 self.train_step(self.spec_models[dset_name], dset_name, 'all')
-                # Save a first sample, to visualize bootstrap output
-                self.save_sample(path=str(self.paths['samples_training']), model=self.model, dset_name=dset_name, epoch=epoch)
                 if (epoch + 1) % self.metrics_freq['train'] == 0:
                     metrics_training, metrics_validation = self.compute_metrics(self.model, dset_name)
                     print(f">>> Aggregating metrics")
@@ -700,14 +704,14 @@ class Typhon(object):
                         self.load_model_and_optims(self.paths['train_model_s'], 'train', frozen=False)
                     print(f">>> Train {dset_name} with unfrozen feature extractor")
 
+                # Save a first sample, to visualize bootstrap output
+                self.save_sample(path=str(self.paths['samples_training']), model=self.model, dset_name=dset_name, epoch=0)
                 for epoch in tqdm(range(self.nb_epochs['train'])):
                     print(f">>>> Epoch {epoch}")
                     self.model.train()
                     if feature_extractor == 'frozen': self.model.freeze_fe()
                     if feature_extractor == 'unfrozen': self.model.unfreeze_fe()
                     self.train_step(self.model, dset_name, 'all')
-                    # Save a first sample, to visualize bootstrap output
-                    self.save_sample(path=str(self.paths['samples_training']), model=self.model, dset_name=dset_name, epoch=epoch)
                     if (epoch + 1) % self.metrics_freq['train'] == 0:
                         metrics_training, metrics_validation = self.compute_metrics(self.model, dset_name)
                         # Add training and validation metrics for this epoch
@@ -774,6 +778,8 @@ class Typhon(object):
                 self.load_model_and_optims(self.paths['spec_models_s'][dset_name], 'spec', frozen=False)
                 print(f">> Train {dset_name} with unfrozen feature extractor")
 
+            # Save a first sample, to visualize bootstrap output
+            self.save_sample(path=str(self.paths['samples_training']), model=self.model, dset_name=dset_name, epoch=0)
             # Loop for the specialization epochs
             for epoch in range(self.nb_epochs['spec']):
                 print(f">>> Epoch {epoch}")
@@ -781,8 +787,6 @@ class Typhon(object):
                 if feature_extractor == 'frozen': self.spec_models[dset_name].freeze_fe()
                 if feature_extractor == 'unfrozen': self.spec_models[dset_name].unfreeze_fe()
                 self.train_step(self.spec_models[dset_name], dset_name, 'all')
-                # Save a first sample, to visualize bootstrap output
-                self.save_sample(path=str(self.paths['samples_training']), model=self.model, dset_name=dset_name, epoch=epoch)
                 if (epoch + 1) % self.metrics_freq['train'] == 0:
                     metrics_training, metrics_validation = self.compute_metrics(self.model, dset_name)
                     print(f">>> Aggregating metrics")
