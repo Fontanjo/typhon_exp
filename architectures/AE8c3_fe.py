@@ -10,11 +10,11 @@ def get_block(dropout, in_channels=1):
         nn.BatchNorm2d(64),
         nn.ReLU(True),
 
-        nn.Conv2d(in_channels=64, out_channels=1, kernel_size=8, stride=4),
-        
-        nn.Flatten(), # shape = (batch, 8400)
+        nn.Conv2d(in_channels=64, out_channels=1, kernel_size=8, stride=4, padding=(2,0)),
 
-        nn.Linear(52*40, 128),
+        nn.Flatten(),
+
+        nn.Linear(52*39, 128),
         nn.ELU(),
         nn.Dropout(p=dropout),
 
