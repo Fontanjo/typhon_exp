@@ -535,6 +535,7 @@ class Typhon(object):
 
     # Save a sample of the current model
     def save_sample(self, path, model, dset_name, epoch):
+        if epoch != 0: epoch += 1 # Except for first one (before training), save_sample is called checking (epoch+1) % 0
         data_loader = self.test_data_loaders[dset_name]
         # Load 1 batch
         inputs, labels = next(iter(data_loader)) # Access only 1 batch
