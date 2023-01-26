@@ -622,3 +622,28 @@ class EqualPixels2(torch.nn.Module):
         pos_diff = self.to_one(pos_diff)
         # Sum
         return torch.sum(pos_diff)
+
+
+class EqualPixelsBCE(torch.nn.Module):
+    # def __init__(self, rtol=1e-05, atol=1e-08):
+    def __init__(self, lambd=0.1, factor=10):
+        super().__init__()
+        self.factor = factor
+        self.lambd = lambd
+        self.remove_small = torch.nn.Hardshrink(lambd=self.lambd)
+        self.to_one = torch.nn.Tanh()
+        self.bce = torch.nn.BCELoss(reduction='none')
+        # self.rtol = rtol
+        # self.atol = atol
+
+    def forward(self, raw_predictions, labels_tensor):
+        diff = self.bce(raw_predictions, labels_tensor)
+        # Remove small values
+        hsr_diff = self.remove_small(diff)
+        # # Get all positie values # Not necessary, bce always positive
+        # pos_diff = torch.abs(hsr_diff)
+        # Push to 1 values that are (now) not 0
+        pos_diff = torch.multiply(hsr_diff, self.factor)
+        pos_diff = self.to_one(pos_diff)
+        # Aggregate
+        return torch.mean(pos_diff)
