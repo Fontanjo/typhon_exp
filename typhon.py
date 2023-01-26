@@ -508,7 +508,7 @@ class Typhon(object):
     # type is either 'train' or 'spec'
     def compare_models(self, model, dset_name, type, save_path, epoch, metrics_validation):
         # At first epoch save the model and the score to have a baseline
-        if epoch == 0:
+        if epoch == 0 or not getattr(self, "best_metrics_dict", None):
             self.best_metrics_dict = copy.deepcopy(metrics_validation)
             self.best_metrics_dict['epoch'] = epoch
             self.best_models[dset_name] = copy.deepcopy(model)
@@ -601,7 +601,7 @@ class Typhon(object):
                     # Save a sample
                     self.save_sample(path=str(self.paths['samples_training']), model=self.model, dset_name=dset_name, epoch=epoch)
                 # Save after each epoch, so we can quit and resume at any time
-                model_state = self.model.to_state_dict()
+                model_state = copy.deepcopy(self.model.to_state_dict()) # to_state_dict returns a reference to the state and not the copy, thus it will be modified
                 torch.save(model_state, self.paths['train_model_p'])
 
         # Test and save trained models
@@ -723,23 +723,23 @@ class Typhon(object):
                         print(f">>> {self.opt_metrics['train']} val: {metrics_validation[self.opt_metrics['train']]} ")
                         # Save a sample
                         self.save_sample(path=str(self.paths['samples_training']), model=self.model, dset_name=dset_name, epoch=epoch)
-                    if (feature_extractor == 'unfrozen') and (idx == 0):
-                        # Save also the very first base model, after the "normal training"
+                        if (feature_extractor == 'unfrozen') and (idx == 0):
+                            # Save also the very first base model, after the "normal training"
+                            self.compare_models(
+                                model=self.model,
+                                dset_name=dset_name,
+                                type='train',
+                                save_path=self.paths['gen_model_s'],
+                                epoch=epoch,
+                                metrics_validation=metrics_validation)
+
                         self.compare_models(
                             model=self.model,
                             dset_name=dset_name,
                             type='train',
-                            save_path=self.paths['gen_model_s'],
+                            save_path=self.paths['train_model_s'],
                             epoch=epoch,
                             metrics_validation=metrics_validation)
-
-                    self.compare_models(
-                        model=self.model,
-                        dset_name=dset_name,
-                        type='train',
-                        save_path=self.paths['train_model_s'],
-                        epoch=epoch,
-                        metrics_validation=metrics_validation)
 
             # Test first (target) dataset
             if idx == 0:
