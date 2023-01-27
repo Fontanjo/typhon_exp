@@ -18,7 +18,7 @@ cfg = {
     'trg_gpu' : sys.argv[-1] if not (sys.argv[-1].endswith('.py') or sys.argv[-1].startswith('-')) else Path(__file__).stem.split('_')[-1],
     'trg_n_cpu' : 8, # how many CPU threads to use
     # Datasets
-    'dsets' : ['BUSI', 'BUSI', 'BUSI'],
+    'dsets' : ['BUSI', 'BUSI1', 'BUSI2'],
     'trg_dset' : 'BUSI',
     # Pad and crop to get specific dimension
     # One for each dset, or just one if same for all. None to leave as it is
@@ -49,7 +49,7 @@ cfg = {
     # Only for training, since in specialization it trains on all batches
     'nb_batches_per_epoch' : 1,
     'epochs' : {
-        'train' : 1000,
+        'train' : 5000,
         'spec' : 0,
     },
     'architecture' : 'unet_v2', # Pass only top 32, to force learning bigger sprites

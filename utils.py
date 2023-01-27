@@ -174,12 +174,10 @@ def segmentation_loader(cuda_device):
     def the_loader(path):
         # Load data
         ary = np.load(path)
-        # Convert to 1-channel if necessary
-        # if len(ary.shape) == 3:
-        #     ary = ary.transpose(1, 2, 0).dot([0.299, 0.587, 0.114])
-            # print('image converted to 1 channel')
-        # Add color channel
-        ary.shape = (1, *ary.shape)
+        # Add color channel if necessary
+        assert len(ary.shape) == 2 or len(ary.shape) == 3, f'Expect inputs to have 2 or 3 channels, got {len(ary.shape)}'
+        if len(ary.shape) == 2:
+            ary.shape = (1, *ary.shape)
         # Send the tensor to the GPU/CPU depending on what device is available
         tensor = torch.from_numpy(ary).float().to(cuda_device)
         return tensor
