@@ -143,7 +143,10 @@ class Experiment:
         dsets_path_ram = self.cfg['ramdir'] / self.cfg['dsets_path']
         if not is_local_run and not dsets_path_ram.is_dir():
             import shutil
-            shutil.copytree(self.cfg['dsets_path'], dsets_path_ram)
+            # shutil.copytree(self.cfg['dsets_path'], dsets_path_ram)
+            # Copy only dsets used!
+            for dset_name in self.cfg['dsets']:
+                shutil.copytree(self.cfg['dsets_path'] / dset_name, dsets_path_ram / dset_name)
 
         # All paths in one place
         if self.cfg['timestamp']:
