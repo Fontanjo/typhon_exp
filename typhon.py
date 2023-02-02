@@ -196,12 +196,12 @@ class Typhon(object):
             # Compute auc
             labels_list = labels.flatten().cpu().numpy().tolist()
             positive_pred_list = outputs.flatten().cpu().numpy().tolist()
+
+            # Ensure labels contains only 0s and/or 1s
+            # assert set(labels_list) <= set([0,1]), f'To compure AUC, labels must contain only 0s and 1s'
             try:
                 auc = sklearn.metrics.roc_auc_score(labels_list, positive_pred_list).item()
-                # print(f'AUC = {auc}')
-            except ValueError:
-                # print('Only one class present in y_true. ROC AUC score is not defined in that case.')
-                # print('Saving AUC as 0')
+            except ValueError as e:
                 auc = 0
             aucs.append(auc)
 
