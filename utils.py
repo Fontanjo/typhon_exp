@@ -26,6 +26,8 @@ class SegmentationDatasetFolder(torchvision.datasets.DatasetFolder):
     def __getitem__(self, idx):
         img_path, img_mask_path = self.data[idx]
         img = self.loader(img_path)
+        # assert img.max() <= 1, f'Wrong format for {self.data[idx]}'
+        # assert img.min() >= 0, f'Wrong format for {self.data[idx]}'
         img_mask = self.loader(img_mask_path)
         # Ensure the sizes are correct
         if self.img_dim is not None:
