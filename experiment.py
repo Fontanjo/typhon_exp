@@ -220,20 +220,55 @@ class Experiment:
             # Initialize new random model
             self.typhon.random_initialization()
         # Security check
-        if  self.cfg['initialization'] == 'load':
+        if self.cfg['initialization'] == 'load':
             assert self.paths['bootstrap_model'].is_file(), f"Bootstrap initialization file missing ({self.paths['bootstrap_model']}), please choose another initialization"
             print("> Loading Bootstrap initialization from ", self.paths['bootstrap_model'])
+        # Compute time for bootstrap
+        checkpoint_bootstrap = time.perf_counter()
         if self.cfg['transfer'] == 'sequential':
             self.typhon.s_train(self.paths['bootstrap_model'])
+            checkpoint_train = time.perf_counter()
             if self.cfg['epochs']['spec'] > 0: self.typhon.s_specialization(self.paths['train_model_s'])
         if self.cfg['transfer'] == 'parallel':
             if self.cfg['resume']:
                 self.typhon.p_train(self.paths['train_model_p'])
+                checkpoint_train = time.perf_counter()
             else:
                 self.typhon.p_train(self.paths['bootstrap_model'])
+                checkpoint_train = time.perf_counter()
             if self.cfg['epochs']['spec'] > 0: self.typhon.p_specialization(self.paths['train_model_p'])
+
+
+
+
+        # PIECE OF CODE TO MANUALLY TEST MODEL
+        # DELETE ME
+        # self.typhon.load_model_and_optims(self.paths['train_model_p'], 'train', frozen=False)
+        # self.typhon.load_data('train', classic_loader=False)
+        # print(f">> Results for DATASET_B, WITHOUT specialization")
+        # metrics_test = self.typhon.test_model(
+        #     model=self.typhon.model,
+        #     dset_name='BUSI',
+        #     test_data_loader=self.typhon.test_data_loaders['BUSI'],
+        #     verbose=True)
+        # self.typhon.load_model_and_optims(self.paths['spec_models_p']['BUSI'], 'spec', frozen=False)
+        # self.typhon.load_data('spec', classic_loader=False)
+        # print(f">> Results for DATASET_B, WITH specialization")
+        # metrics_test = self.typhon.test_model(
+        #     model=self.typhon.spec_models['BUSI'],
+        #     dset_name='BUSI',
+        #     test_data_loader=self.typhon.test_data_loaders['BUSI'],
+        #     verbose=True)
+
+
 
         stop = time.perf_counter()
         total_time = stop - start
+        bootstrat_time = checkpoint_bootstrap - start
+        training_time = checkpoint_train - checkpoint_bootstrap
+        spec_time = stop - checkpoint_train
+        print(f"Bootstrap took {int(bootstrat_time / 3600)} hours {int((bootstrat_time % 3600) / 60)} minutes {bootstrat_time % 60:.1f} seconds")
+        print(f"Training took {int(training_time / 3600)} hours {int((training_time % 3600) / 60)} minutes {training_time % 60:.1f} seconds")
+        print(f"Specialization took {int(spec_time / 3600)} hours {int((spec_time % 3600) / 60)} minutes {spec_time % 60:.1f} seconds")
         print(f"Experiment ended in {int(total_time / 3600)} hours {int((total_time % 3600) / 60)} minutes {total_time % 60:.1f} seconds")
         utils.print_time('END EXPERIMENT')

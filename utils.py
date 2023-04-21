@@ -5,6 +5,7 @@ import torch
 import torchvision
 import glob
 import time
+from scipy import ndimage
 
 
 class SegmentationDatasetFolder(torchvision.datasets.DatasetFolder):
@@ -178,10 +179,19 @@ def segmentation_loader(cuda_device):
         ary = np.load(path)
         # Add color channel if necessary
         assert len(ary.shape) == 2 or len(ary.shape) == 3, f'Expect inputs to have 2 or 3 channels, got {len(ary.shape)}'
+
+
+        # DO THIS CURRENTLY BECAUSE BRAIN DATASET HAS 3 CHANNELS
+        # TODO: NEED REPROCESS THE DATASET TO SEPARATE THE 3 CHANNELS
+        if ('BRAIN' in path) and ('mask' not in path): ary = ary[0]
+
+
+
         if len(ary.shape) == 2:
             ary.shape = (1, *ary.shape)
         # Send the tensor to the GPU/CPU depending on what device is available
-        tensor = torch.from_numpy(ary).float().to(cuda_device)
+        # tensor = torch.from_numpy(ary).float().to(cuda_device) # TODO: consider float 16
+        tensor = torch.from_numpy(ary).to(torch.float16).to(cuda_device)
         return tensor
     return the_loader
 
@@ -266,7 +276,7 @@ def get_metrics(loss_function, confusion_matrix_dict, predictions_per_batch):
         'f1score': f1score, 'specificity': specificity, 'auc': auc}
 
 
-def get_segmentation_metrics(losses, aucs, confusion_matrix_dict):
+def get_segmentation_metrics(losses, hausdorff_distances, confusion_matrix_dict):
     # Get totals
     tp = sum(confusion_matrix_dict['TP'])
     fp = sum(confusion_matrix_dict['FP'])
@@ -300,21 +310,27 @@ def get_segmentation_metrics(losses, aucs, confusion_matrix_dict):
 
     if tp + fp + fn:
         iou = tp / (tp + fp + fn)
+        dice = 2*tp / (2*tp + fp + fn)
     else:
         iou = 0.0
+        dice = 0.0
 
     # Receive directly the per-batch losses and average them
     loss = np.mean(losses)
 
+    # Receive directly the per-batch Hausdorff distances and average them
+    hd = np.mean(hausdorff_distances)
+
     # Receive the per-batch auc and average them
     #  In some cases, the auc can not be computed and is saved as 0 (when only 1 label)
     #  Ignore this cases for the average
-    auc = np.mean([a for a in aucs if a != 0])
+    # auc = np.mean([a for a in aucs if a != 0])
+    # auc = 0
 
     return {
         'loss': loss, 'accuracy': accuracy,
         'precision': precision, 'recall': recall,
-        'f1score': f1score, 'specificity': specificity, 'auc': auc, 'iou': iou}
+        'f1score': f1score, 'specificity': specificity, 'iou': iou, 'dice': dice, 'hd': hd}
 
 
 
@@ -376,6 +392,58 @@ def get_autoencoding_metrics(losses, aucs, confusion_matrix_dict):
         'loss': loss, 'accuracy': accuracy,
         'precision': precision, 'recall': recall,
         'f1score': f1score, 'specificity': specificity, 'auc': auc, 'iou': iou}
+
+
+def hausdorff_dist(input, target):
+    """
+    Computes the Hausdorff distance between target and input
+    Args:
+        input: Input tensor (predictions of the model), binary image
+        target: Groundtruth segmentation, binary image
+    """
+
+    assert input.size() == target.size(), f"'input' and 'target' must have the same shape, got {input.size()} and {target.size()}"
+
+    # distances = np.array([])
+    distances = []
+
+    # Inspired from https://cs.stackexchange.com/questions/117989/hausdorff-distance-between-two-binary-images-according-to-distance-maps
+    # input and target come from a batch, so iterate on each single image-label pair
+    for prediction, label in zip(input, target):
+        # Transform to the required type for cv2 (i.e. Numpy binary array of 8-bits per pixel)
+        # Take the first (only) channel, otherwise cv2 crashes
+        prediction = prediction.cpu().numpy().astype(np.uint8)[0]
+        label = label.cpu().numpy().astype(np.uint8)[0]
+
+        # inverted_prediction = 1 - prediction
+        # dist_map_prediction = cv2.distanceTransform(inverted_prediction, cv2.DIST_L2, maskSize=cv2.DIST_MASK_PRECISE)
+        dist_map_prediction = ndimage.distance_transform_edt(1 - prediction)
+        # dist_map_prediction = ndimage.distance_transform_edt(inverted_prediction)
+        try:
+            distance_1 = np.max(dist_map_prediction[label.astype(bool)])
+        except ValueError: # TODO capire perché value error
+            distance_1 = 0
+        # distance_1 = max(dist_map_prediction[label.astype(bool)])
+
+        inverted_label = 1 - label
+        # dist_map_label = cv2.distanceTransform(inverted_label, cv2.DIST_L2, maskSize=cv2.DIST_MASK_PRECISE)
+        dist_map_label = ndimage.distance_transform_edt(inverted_label)
+
+        # Prediction could be fully 0, thus no values will be retained when masking
+        try:
+            distance_2 = np.max(dist_map_label[prediction.astype(bool)])
+        except ValueError:
+            distance_2 = 0
+
+        # distances = np.append(distances, max(distance_1, distance_2))
+        distances.append(max(distance_1, distance_2))
+
+        # print(label.astype(bool))
+        # print(dist_map_prediction)
+        # print(dist_map_prediction[label.astype(bool)])
+
+
+    return np.mean(distances)
 
 
 #############################################
@@ -498,6 +566,32 @@ class GeneralizedDiceLoss(_AbstractDiceLoss):
 
         return 2 * (intersect.sum() / denominator.sum())
 
+
+class ContinuousDiceLoss(_AbstractDiceLoss):
+    """Computes Continuous Dice Loss (CDL) as described in https://arxiv.org/abs/1906.11031"""
+
+    def __init__(self, weight=None, normalization='sigmoid'):
+        super().__init__(weight, normalization)
+
+    def dice(self, input, target, weight=None, epsilon=1e-6):
+        # input and target shapes must match
+        assert input.size() == target.size(), f"'input' and 'target' must have the same shape, got {input.size()} and {target.size()}"
+
+        input = input.flatten()
+        target = target.flatten()
+        target = target.float()
+
+        # compute per channel Dice Coefficient
+        intersect = (input * target).sum(-1)
+        if weight is not None:
+            intersect = weight * intersect
+
+        c = intersect / (target * torch.sign(input)).sum(-1)
+
+        # here we can use standard dice (input + target).sum(-1) or extension (see V-Net) (input^2 + target^2).sum(-1)
+        denominator = (input*input).sum(-1) + c*(target*target).sum(-1)
+
+        return 2*intersect / denominator.clamp(min=epsilon)
 
 
 class VAELossMSE(torch.nn.Module):

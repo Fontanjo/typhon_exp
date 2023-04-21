@@ -17,7 +17,7 @@ FILE_PATH = "./results_atari/20221230_AE6_all2_0/run_logs/221230_2012.log" # AE6
 
 FILE_PATH = "./results_atari/20221231_AE6_all2_0/run_logs/221231_0036.log" # AE6
 
-FILE_PATH = "./results_atari/20221231_AE6_s2_0_3/run_logs/221231_0038.log" # AE6_s2
+FILE_PATH = "./results_atari/20230112_like_1_but_compact_fe_bce_5envs_4/run_logs/230112_2110.log" # AE6_s2
 
 
 def main():

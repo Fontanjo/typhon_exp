@@ -18,6 +18,9 @@ opencv-python = "*"
 nibabel = "*"
 tqdm = "*"
 pydicom = "*"
+scipy = "*"
+jupyter-nbextensions-configurator = "*"
+jupyterthemes = "*"
 
 [dev-packages]
 

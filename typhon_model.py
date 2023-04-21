@@ -50,8 +50,10 @@ class TyphonModel(nn.Module):
 
 
     def forward(self, x, dset_name):
-        x = self.fe(x)
-        return self.dms[dset_name](x)
+        with torch.cuda.amp.autocast():
+            x = self.fe(x)
+            x = self.dms[dset_name](x)
+        return x
 
 
     # Sets dropout on model -- IMPORTANT when loading from target state!

@@ -155,8 +155,11 @@ class Typhon(object):
         # List of losses
         losses = []
 
+        # List of Hausdorff distances
+        hausdorff_distances = []
+
         # List of auc
-        aucs = []
+        # aucs = []
 
         confusion_matrix_dict = {}
 
@@ -165,8 +168,8 @@ class Typhon(object):
         # For each batch
         for inputs, labels in test_data_loader:
             # Reinitialize
-            raw_predictions = torch.tensor([]).to(self.cuda_device)
-            labels_tensor = torch.tensor([]).to(self.cuda_device)
+            # raw_predictions = torch.tensor([]).to(self.cuda_device)
+            # labels_tensor = torch.tensor([]).to(self.cuda_device)
 
             # Send data to GPU if available
             inputs, labels = inputs.to(self.cuda_device), labels.to(self.cuda_device)
@@ -186,11 +189,14 @@ class Typhon(object):
 
 
             # TODO: improve, useless to create empty tensor and then concatenate only 1 argument
-            raw_predictions = torch.cat((raw_predictions, outputs), 0)
-            labels_tensor = torch.cat((labels_tensor, labels), 0)
+            # raw_predictions = torch.cat((raw_predictions, outputs), 0)
+            # labels_tensor = torch.cat((labels_tensor, labels), 0)
+            # print(torch.equal(labels_tensor, labels))
+            # print(f"pred {torch.equal(raw_predictions, outputs)}")
 
             # Compute loss
-            ls = self.loss_functions[dset_name](raw_predictions, labels_tensor).item()
+            # ls = self.loss_functions[dset_name](raw_predictions, labels_tensor).item()
+            ls = self.loss_functions[dset_name](outputs, labels).item()
             losses.append(ls)
 
             # Compute auc
@@ -199,23 +205,31 @@ class Typhon(object):
 
             # Ensure labels contains only 0s and/or 1s
             # assert set(labels_list) <= set([0,1]), f'To compure AUC, labels must contain only 0s and 1s'
-            try:
-                auc = sklearn.metrics.roc_auc_score(labels_list, positive_pred_list).item()
-            except ValueError as e:
-                auc = 0
-            aucs.append(auc)
+            # try:
+            #     auc = sklearn.metrics.roc_auc_score(labels_list, positive_pred_list).item()
+            # except ValueError as e:
+            #     auc = 0
+            # aucs.append(auc)
 
             # Set the values of the output to 0 or 1 (tumor at pixel xy or not) and cast to int
-            predicted = (outputs > 0.5).int()
+            predicted = (outputs > 0.5).int() # TODO check if sigmoid used in paper, else remove and use +-0. Convert in bool, not int.
             labels = labels.int()
+
+            hd = utils.hausdorff_dist(predicted, labels)
+            hausdorff_distances.append(hd)
 
             # TODO check efficiency and possibly find a better way
             tp = torch.sum((predicted==labels) * (predicted==1)).item()
             tn = torch.sum((predicted==labels) * (predicted==0)).item()
             fp = torch.sum((predicted!=labels) * (predicted==1)).item()
             fn = torch.sum((predicted!=labels) * (predicted==0)).item()
-
             conf_matrix_per_batch = {'TP': tp, 'FP': fp, 'TN': tn, 'FN': fn}
+
+            # print(f"{predicted} AND {labels}")
+            # (tn, fp), (fn, tp) = sklearn.metrics.confusion_matrix(
+            #     labels.flatten().cpu(), predicted.flatten().cpu(), labels=[0,1])
+            # conf_matrix_per_batch = {'TP': tp, 'FP': fp, 'TN': tn, 'FN': fn}
+            # print(f"{conf_matrix_per_batch} VS {conf_matrix_per_batch2}")
 
             for key, value in conf_matrix_per_batch.items():
                 confusion_matrix_dict.setdefault(key, []).append(value)
@@ -223,8 +237,9 @@ class Typhon(object):
         end = time.perf_counter()
 
 
-
-        metrics_test = utils.get_segmentation_metrics(losses, aucs, confusion_matrix_dict)
+        # print(confusion_matrix_dict)
+        metrics_test = utils.get_segmentation_metrics(losses, hausdorff_distances, confusion_matrix_dict)
+        # print(f"{metrics_test['dice']} VS {metrics_test['loss']}")
         # metrics_test = utils.get_segmentation_metrics(self.loss_functions[dset_name], predictions_per_batch, confusion_matrix_dict)
 
         if verbose:
@@ -239,6 +254,8 @@ class Typhon(object):
             F1 score: {metrics_test['f1score']}
             Specificity: {metrics_test['specificity']}
             IoU: {metrics_test['iou']}
+            Dice: {metrics_test['dice']}
+            Hausdorff distance: {metrics_test['hd']}
             --------------------
             Running time: {end-start}
 
@@ -380,7 +397,8 @@ class Typhon(object):
                 bootstrap_loop_loader = utils.LoopLoader(
                     dset_path=self.paths['dsets'][dset_name],
                     # Use both train and val sets, more data for bootstrap!
-                    which=['train', 'val'],
+                    # which=['train', 'val'],
+                    which=['val'],
                     batch_size=self.batch_size['train'],
                     cuda_device=self.cuda_device,
                     training_task=self.training_task,
@@ -422,7 +440,7 @@ class Typhon(object):
                 test_loop_loader = utils.LoopLoader(
                     dset_path=self.paths['dsets'][dset_name],
                     which=['test'],
-                    batch_size=1,
+                    batch_size=self.batch_size[type],
                     cuda_device=self.cuda_device,
                     training_task=self.training_task,
                     img_dim=self.img_dims[dset_name],
@@ -550,10 +568,17 @@ class Typhon(object):
         inp, out, lab = inp[0].transpose(1, 2, 0), out[0].transpose(1, 2, 0), lab[0].transpose(1, 2, 0)
 
 
+        # print(f"{dset_name} and {np.min(inp)} to {np.max(inp)} with")
+
+
+        # Transform predictions to binary image, like the groundtruth
+        out = (out > 0.5).astype(np.uint8)
+
         # cv2.imwrite(str(self.paths['samples'] / f'ep{epoch}_{dset_name}_input.jpg'), inp * 255)
-        cv2.imwrite(path + f'/ep{epoch}_{dset_name}_input.png', inp * 255)
-        cv2.imwrite(path + f'/ep{epoch}_{dset_name}_output.png', out * 255)
-        cv2.imwrite(path + f'/ep{epoch}_{dset_name}_label.png', lab * 255)
+        cv2.imwrite(path + f'/ep{epoch}_{dset_name}_input.png', inp.astype(np.float) * 255)
+        # cv2.imwrite(path + f'/ep{epoch}_{dset_name}_output.png', out * 255)
+        cv2.imwrite(path + f'/ep{epoch}_{dset_name}_output.png', out.astype(np.float) * 255)
+        cv2.imwrite(path + f'/ep{epoch}_{dset_name}_label.png', lab.astype(np.float) * 255)
 
 
 
@@ -579,8 +604,15 @@ class Typhon(object):
             range_epochs = range(start_epoch, start_epoch + self.nb_epochs['train'])
             print(f"> Resuming training from epoch {start_epoch}")
 
-        # Save a first sample, to visualize bootstrap output
+        # Save a first sample and results, to visualize bootstrap output
         for dset_name in self.dsets_names:
+            metrics_training, metrics_validation = self.compute_metrics(self.model, dset_name)
+            # Add training and validation metrics for this epoch
+            print(f">>> Aggregating metrics and saving")
+            self.aggregate_metrics(metrics_training, 'train', dset_name, 0, 'trained', 'unfrozen')
+            self.aggregate_metrics(metrics_validation, 'validation', dset_name, 0, 'trained', 'unfrozen')
+            print(f">>> {self.opt_metrics['train']} train: {metrics_training[self.opt_metrics['train']]} ")
+            print(f">>> {self.opt_metrics['train']} val: {metrics_validation[self.opt_metrics['train']]} ")
             self.save_sample(path=str(self.paths['samples_training']), model=self.model, dset_name=dset_name, epoch=0)
 
         for epoch in tqdm(range_epochs):
@@ -590,7 +622,7 @@ class Typhon(object):
                 print(f">>> Dset {dset_name}")
                 self.model.train()
                 self.train_step(self.model, dset_name, 'some')
-                if (epoch + 1) % self.metrics_freq['train'] == 0:
+                if epoch % self.metrics_freq['train'] == 0:
                     metrics_training, metrics_validation = self.compute_metrics(self.model, dset_name)
                     # Add training and validation metrics for this epoch
                     print(f">>> Aggregating metrics and saving")
@@ -635,6 +667,7 @@ class Typhon(object):
             self.save_sample(path=str(self.paths['samples_training']), model=self.model, dset_name=dset_name, epoch=0)
 
         for dset_name in self.dsets_names:
+
             utils.print_time(f">> Dataset {dset_name}")
 
             # Loop for the specialization epochs
@@ -642,7 +675,7 @@ class Typhon(object):
                 print(f">>> Epoch {epoch}")
                 self.spec_models[dset_name].train()
                 self.train_step(self.spec_models[dset_name], dset_name, 'all')
-                if (epoch + 1) % self.metrics_freq['train'] == 0:
+                if epoch % self.metrics_freq['spec'] == 0:
                     metrics_training, metrics_validation = self.compute_metrics(self.model, dset_name)
                     print(f">>> Aggregating metrics")
                     self.aggregate_metrics(metrics_training, 'train', dset_name, epoch, 'specialized', 'unfrozen')
@@ -868,9 +901,17 @@ class Typhon(object):
                 new_score = current[dset_name][self.opt_metrics['bootstrap']]
 # to create bootstrap plot                # print(new_score)
                 best_score = best[dset_name][self.opt_metrics['bootstrap']]
-                if new_score > best_score:
-                    nbetterheads += 1
-                    print(f">>> Current better `{self.opt_metrics['bootstrap']}` for {dset_name}: {new_score}")
+
+                # Metrics to minimize (list to complete)
+                if self.opt_metrics['bootstrap'] in ['hd']:
+                    if new_score < best_score:
+                        nbetterheads += 1
+                        print(f">>> Current better `{self.opt_metrics['bootstrap']}` for {dset_name}: {new_score}")
+                # Otherwise metrics to maximize
+                else:
+                    if new_score > best_score:
+                        nbetterheads += 1
+                        print(f">>> Current better `{self.opt_metrics['bootstrap']}` for {dset_name}: {new_score}")
                 # Make sure this is only when using AUC
                 if new_score < 0.5 and (self.opt_metrics['bootstrap'] == 'auc'):
                     bad_model = True
@@ -888,6 +929,13 @@ class Typhon(object):
                 # At least two better heads and a better total
                     # iou mostly around 0 but sometime up to 7/8
                 if (nbetterheads > 1) and sum(opt_metrics) > sum([best[dset_name][self.opt_metrics['bootstrap']] for dset_name in self.dsets_names]):
+                    print(f">> New best model")
+                    best = current
+                    for dset_name in self.dsets_names:
+                        print(f">>> New {self.opt_metrics['bootstrap']} score for {dset_name}: {best[dset_name][self.opt_metrics['bootstrap']]}")
+            elif self.opt_metrics['bootstrap'] == 'hd':
+                # At least two better heads and max difference of 150 -> better model
+                if (nbetterheads > 1) and ((max(opt_metrics) - min(opt_metrics)) < 150):
                     print(f">> New best model")
                     best = current
                     for dset_name in self.dsets_names:
