@@ -742,7 +742,7 @@ class Typhon(object):
 
 
                     self.aggregate_metrics(metrics_test, 'test', dset_name, epoch, 'trained', 'unfrozen')
-                    print(f">>> {self.opt_metrics['train']} val: {metrics_test[self.opt_metrics['train']]} ")
+                    print(f">>> {self.opt_metrics['train']} test: {metrics_test[self.opt_metrics['train']]} ")
 
 
 
@@ -1025,6 +1025,16 @@ class Typhon(object):
                 dsets_names=self.dsets_names)
 
             nbetterheads = 0
+
+
+
+
+            # Save max diff of best and worse head
+            max_diff = float("inf")
+
+
+
+
             # Need to reset the dict at each new model
             current = {dset:{} for dset in self.dsets_names}
             current['model'] = model
@@ -1074,8 +1084,17 @@ class Typhon(object):
                 # Otherwise metrics to maximize
                 else:
                     if new_score > best_score:
-                        nbetterheads += 1
-                        print(f">>> Current better `{self.opt_metrics['bootstrap']}` for {dset_name}: {new_score}")
+
+
+
+                        # HARDCODED! if good for BUSI then probably good for BUS as well
+                        if dset_name != 'BUS_SELECTED':
+                            nbetterheads += 1
+                            print(f">>> Current better `{self.opt_metrics['bootstrap']}` for {dset_name}: {new_score}")
+
+
+
+
                 # Make sure this is only when using AUC
                 if new_score < 0.5 and (self.opt_metrics['bootstrap'] == 'auc'):
                     bad_model = True
@@ -1102,6 +1121,15 @@ class Typhon(object):
                 if (nbetterheads > 1) and ((max(opt_metrics) - min(opt_metrics)) < 150):
                     print(f">> New best model")
                     best = current
+                    for dset_name in self.dsets_names:
+                        print(f">>> New {self.opt_metrics['bootstrap']} score for {dset_name}: {best[dset_name][self.opt_metrics['bootstrap']]}")
+            elif self.opt_metrics['bootstrap'] == 'dice':
+                # At least two better heads and small difference between best and worse head
+                new_diff = (max(opt_metrics) - min(opt_metrics))
+                if (nbetterheads > 1) and (new_diff < max_diff):
+                    print(f">> New best model")
+                    best = current
+                    max_diff = new_diff
                     for dset_name in self.dsets_names:
                         print(f">>> New {self.opt_metrics['bootstrap']} score for {dset_name}: {best[dset_name][self.opt_metrics['bootstrap']]}")
             else:
