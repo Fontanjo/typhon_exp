@@ -29,7 +29,7 @@ class SegmentationDatasetFolder(torchvision.datasets.DatasetFolder):
         img = self.loader(img_path)
         # assert img.max() <= 1, f'Wrong format for {self.data[idx]}'
         # assert img.min() >= 0, f'Wrong format for {self.data[idx]}'
-        img_mask = self.loader(img_mask_path)
+        img_mask = self.loader(img_mask_path).to(torch.float16)
         # Ensure the sizes are correct
         if self.img_dim is not None:
             # Second argument in torch padding requires the size to add "before last dimension", "after last dimension", "before second-to-last dimension", ...
@@ -185,13 +185,15 @@ def segmentation_loader(cuda_device):
         # TODO: NEED REPROCESS THE DATASET TO SEPARATE THE 3 CHANNELS
         if ('BRAIN' in path) and ('mask' not in path): ary = ary[0]
 
-
+        # # TODO: make dataset consistent with the other, instead of changing it at runtime
+        # if ('BUSI' in path): ary = np.divide(ary, 255)
+        # if ('LIDC' in path): ary = np.divide(ary, 255)
 
         if len(ary.shape) == 2:
             ary.shape = (1, *ary.shape)
         # Send the tensor to the GPU/CPU depending on what device is available
-        # tensor = torch.from_numpy(ary).float().to(cuda_device) # TODO: consider float 16
-        tensor = torch.from_numpy(ary).to(torch.float16).to(cuda_device)
+        tensor = torch.from_numpy(ary).float().to(cuda_device) # TODO: consider float 16
+        # tensor = torch.from_numpy(ary).to(torch.float16).to(cuda_device)
         return tensor
     return the_loader
 
@@ -310,16 +312,26 @@ def get_segmentation_metrics(losses, hausdorff_distances, confusion_matrix_dict)
 
     if tp + fp + fn:
         iou = tp / (tp + fp + fn)
-        dice = 2*tp / (2*tp + fp + fn)
+        # dice = 2*tp / (2*tp + fp + fn)
     else:
-        iou = 0.0
-        dice = 0.0
+        iou = 1.0
+        # dice = 1.0
+
+    # Compute dice same as paper
+    smooth = 0.0001
+    i = tp + fn # label = 1
+    j = tp + fp # prediction = 1
+    intersection = tp
+    dice = (2. * intersection + smooth) / (i + j + smooth)
 
     # Receive directly the per-batch losses and average them
     loss = np.mean(losses)
 
     # Receive directly the per-batch Hausdorff distances and average them
     hd = np.mean(hausdorff_distances)
+
+    # Receive directly the per-batch dices and average them
+    # dice = np.mean(dices)
 
     # Receive the per-batch auc and average them
     #  In some cases, the auc can not be computed and is saved as 0 (when only 1 label)
@@ -392,6 +404,16 @@ def get_autoencoding_metrics(losses, aucs, confusion_matrix_dict):
         'loss': loss, 'accuracy': accuracy,
         'precision': precision, 'recall': recall,
         'f1score': f1score, 'specificity': specificity, 'auc': auc, 'iou': iou}
+
+
+def dice_score(prediction, labels):
+    return DiceLoss()(prediction, labels).cpu().numpy().item()
+
+    # prediction = torch.nn.Sigmoid()(prediction)
+    # per_channel = compute_per_channel_dice(prediction, labels)
+    # return (1 - torch.mean(per_channel)).cpu().numpy().item()
+
+
 
 
 def hausdorff_dist(input, target):

@@ -65,6 +65,18 @@ class Typhon(object):
         # assert self.nb_dataset == 3, 'Double check as long as we work with 3'
 
 
+
+
+        self.total_metrics_time = 0
+
+        # We want 100 points in the number of epochs passed
+        self.print_every = self.nb_epochs['train'] // 100
+
+        print(f'Will print every {self.print_every} epochs')
+
+
+
+
     @torch.no_grad()
     def test_model(self, model, dset_name, test_data_loader, verbose=False):
         if self.training_task == 'segmentation':
@@ -155,6 +167,9 @@ class Typhon(object):
         # List of losses
         losses = []
 
+        # # List of dices
+        # dices = []
+
         # List of Hausdorff distances
         hausdorff_distances = []
 
@@ -217,6 +232,9 @@ class Typhon(object):
 
             hd = utils.hausdorff_dist(predicted, labels)
             hausdorff_distances.append(hd)
+
+            # dc = utils.dice_score(outputs, labels)
+            # dices.append(dc)
 
             # TODO check efficiency and possibly find a better way
             tp = torch.sum((predicted==labels) * (predicted==1)).item()
@@ -397,8 +415,8 @@ class Typhon(object):
                 bootstrap_loop_loader = utils.LoopLoader(
                     dset_path=self.paths['dsets'][dset_name],
                     # Use both train and val sets, more data for bootstrap!
-                    # which=['train', 'val'],
-                    which=['val'],
+                    which=['train', 'val'],
+                    # which=['val'],
                     batch_size=self.batch_size['train'],
                     cuda_device=self.cuda_device,
                     training_task=self.training_task,
@@ -514,13 +532,58 @@ class Typhon(object):
             dset_name=dset_name,
             test_data_loader=self.train_data_loaders[dset_name])
 
+
+
+
+
+
+            # TODO: move parameter (500) in config file
+            # Consider only a limited amount of samples, to speed up training
+#            test_data_loader=self.smaller_data_loader(500, self.train_data_loaders[dset_name]))
+
+
+
+
+
+
+
+
+
+
         print(f">>> Collecting performance on validation set")
         metrics_validation = self.test_model(
             model=model,
             dset_name=dset_name,
             test_data_loader=self.validation_data_loaders[dset_name])
 
-        return metrics_training, metrics_validation
+
+
+
+            # TODO: move parameter (500) in config file
+            # Consider only a limited amount of samples, to speed up training
+#            test_data_loader=self.smaller_data_loader(500, self.validation_data_loaders[dset_name]))
+
+
+
+
+
+
+
+        print(f">>> Collecting performance on test set")
+        metrics_test = self.test_model(
+            model=model,
+            dset_name=dset_name,
+            test_data_loader=self.test_data_loaders[dset_name])
+
+
+
+
+
+
+
+
+
+        return metrics_training, metrics_validation, metrics_test
 
 
     # type is either 'train' or 'spec'
@@ -538,7 +601,13 @@ class Typhon(object):
         new_opt = metrics_validation[self.opt_metrics[type]]
         best_opt = self.best_metrics_dict[self.opt_metrics[type]]
 
-        if new_opt > best_opt :
+        # Dice is better if it is smaller
+        if self.opt_metrics[type] == 'hd':
+            found_new_best = new_opt < best_opt
+        else:
+            found_new_best = new_opt > best_opt
+
+        if found_new_best:
             utils.print_time(">>> Saving new best model")
             print(f">>> New best: {self.opt_metrics[type]}: {best_opt} -> {new_opt}")
             # Setting new best data
@@ -572,12 +641,14 @@ class Typhon(object):
 
 
         # Transform predictions to binary image, like the groundtruth
-        out = (out > 0.5).astype(np.uint8)
+        out_bin = (out > 0.5).astype(np.uint8)
+
 
         # cv2.imwrite(str(self.paths['samples'] / f'ep{epoch}_{dset_name}_input.jpg'), inp * 255)
         cv2.imwrite(path + f'/ep{epoch}_{dset_name}_input.png', inp.astype(np.float) * 255)
         # cv2.imwrite(path + f'/ep{epoch}_{dset_name}_output.png', out * 255)
         cv2.imwrite(path + f'/ep{epoch}_{dset_name}_output.png', out.astype(np.float) * 255)
+        cv2.imwrite(path + f'/ep{epoch}_{dset_name}_output_bin.png', out_bin.astype(np.float) * 255)
         cv2.imwrite(path + f'/ep{epoch}_{dset_name}_label.png', lab.astype(np.float) * 255)
 
 
@@ -604,16 +675,29 @@ class Typhon(object):
             range_epochs = range(start_epoch, start_epoch + self.nb_epochs['train'])
             print(f"> Resuming training from epoch {start_epoch}")
 
-        # Save a first sample and results, to visualize bootstrap output
-        for dset_name in self.dsets_names:
-            metrics_training, metrics_validation = self.compute_metrics(self.model, dset_name)
-            # Add training and validation metrics for this epoch
-            print(f">>> Aggregating metrics and saving")
-            self.aggregate_metrics(metrics_training, 'train', dset_name, 0, 'trained', 'unfrozen')
-            self.aggregate_metrics(metrics_validation, 'validation', dset_name, 0, 'trained', 'unfrozen')
-            print(f">>> {self.opt_metrics['train']} train: {metrics_training[self.opt_metrics['train']]} ")
-            print(f">>> {self.opt_metrics['train']} val: {metrics_validation[self.opt_metrics['train']]} ")
-            self.save_sample(path=str(self.paths['samples_training']), model=self.model, dset_name=dset_name, epoch=0)
+        # # Save a first sample and results, to visualize bootstrap output
+        # for dset_name in self.dsets_names:
+        #
+        #
+        #
+        #     # metrics_training, metrics_validation = self.compute_metrics(self.model, dset_name)
+        #     metrics_training, metrics_validation, metrics_test = self.compute_metrics(self.model, dset_name)
+        #
+        #
+        #
+        #     # Add training and validation metrics for this epoch
+        #     print(f">>> Aggregating metrics and saving")
+        #     self.aggregate_metrics(metrics_training, 'train', dset_name, 0, 'trained', 'unfrozen')
+        #     self.aggregate_metrics(metrics_validation, 'validation', dset_name, 0, 'trained', 'unfrozen')
+        #     print(f">>> {self.opt_metrics['train']} train: {metrics_training[self.opt_metrics['train']]} ")
+        #     print(f">>> {self.opt_metrics['train']} val: {metrics_validation[self.opt_metrics['train']]} ")
+        #
+        #
+        #     self.aggregate_metrics(metrics_test, 'test', dset_name, 0, 'test', 'unfrozen')
+        #     print(f">>> {self.opt_metrics['train']} val: {metrics_test[self.opt_metrics['train']]} ")
+        #
+        #
+        #     self.save_sample(path=str(self.paths['samples_training']), model=self.model, dset_name=dset_name, epoch=0)
 
         for epoch in tqdm(range_epochs):
             print(f">> Epoch {epoch}")
@@ -622,41 +706,96 @@ class Typhon(object):
                 print(f">>> Dset {dset_name}")
                 self.model.train()
                 self.train_step(self.model, dset_name, 'some')
-                if epoch % self.metrics_freq['train'] == 0:
-                    metrics_training, metrics_validation = self.compute_metrics(self.model, dset_name)
+                # if epoch % self.metrics_freq['train'] == 0:
+
+
+
+
+
+                if epoch % self.print_every == 0:
+
+
+
+
+
+
+
+
+
+                    start_metrics_time = time.time()
+
+
+                    # metrics_training, metrics_validation = self.compute_metrics(self.model, dset_name)
+                    metrics_training, metrics_validation, metrics_test = self.compute_metrics(self.model, dset_name)
+
+
+
+
                     # Add training and validation metrics for this epoch
                     print(f">>> Aggregating metrics and saving")
                     self.aggregate_metrics(metrics_training, 'train', dset_name, epoch, 'trained', 'unfrozen')
                     self.aggregate_metrics(metrics_validation, 'validation', dset_name, epoch, 'trained', 'unfrozen')
                     print(f">>> {self.opt_metrics['train']} train: {metrics_training[self.opt_metrics['train']]} ")
                     print(f">>> {self.opt_metrics['train']} val: {metrics_validation[self.opt_metrics['train']]} ")
+
+
+
+
+                    self.aggregate_metrics(metrics_test, 'test', dset_name, epoch, 'trained', 'unfrozen')
+                    print(f">>> {self.opt_metrics['train']} val: {metrics_test[self.opt_metrics['train']]} ")
+
+
+
+
+
+
+
                     # Save a sample
                     self.save_sample(path=str(self.paths['samples_training']), model=self.model, dset_name=dset_name, epoch=epoch)
-                # Save after each epoch, so we can quit and resume at any time
-                model_state = copy.deepcopy(self.model.to_state_dict()) # to_state_dict returns a reference to the state and not the copy, thus it will be modified
-                torch.save(model_state, self.paths['train_model_p'])
+                    # Save model if it is better than the previous best one
+                    self.compare_models(
+                        # model=self.model,
+                        model=self.model.split_typhon()[dset_name],
+                        dset_name=dset_name,
+                        type='train',
+                        save_path=self.paths['spec_models_p'][dset_name], # TODO fix: now save as spec models since allows multiple models (when multiple dsets)
+                        epoch=epoch,
+                        metrics_validation=metrics_validation)
+                # # Save after each epoch, so we can quit and resume at any time
+                # model_state = copy.deepcopy(self.model.to_state_dict()) # to_state_dict returns a reference to the state and not the copy, thus it will be modified
+                # torch.save(model_state, self.paths['train_model_p'])
+
+
+
+                    stop_metrics_time = time.time()
+                    self.total_metrics_time += stop_metrics_time - start_metrics_time
+
 
         # Test and save trained models
         print(f"> Models training completed, testing now")
         for dset_name in self.dsets_names:
             print(f">> Results for {dset_name}, WITHOUT specialization")
             metrics_test = self.test_model(
-                model=self.model,
+                model=self.best_models[dset_name],
                 dset_name=dset_name,
                 test_data_loader=self.test_data_loaders[dset_name],
                 verbose=True)
 
             self.aggregate_metrics(metrics_test, 'test', dset_name, -1, 'trained', 'unfrozen')
 
+        # TODO: do NOT save the final model, just keep the best
         model_state = self.model.to_state_dict()
         torch.save(model_state, self.paths['train_model_p'])
         print(f"> Training complete")
+
+        # print(f'Metrics computation time: {round(self.total_metrics_time, 4)}')
+        print(f"Metrics computation time: {int(self.total_metrics_time / 3600)} hours {int((self.total_metrics_time % 3600) / 60)} minutes {self.total_metrics_time % 60:.1f} seconds")
 
 
     # Specialization after the parallel training
     def p_specialization(self, model_path):
         utils.print_time("SPECIALIZATION")
-        self.load_data('spec')
+        self.load_data('spec', classic_loader=True)
         self.load_model_and_optims(model_path, 'spec')
         # Best model per each epoch to simulate early stopping on max validation
         best_spec_dict = {}
@@ -853,6 +992,16 @@ class Typhon(object):
 ###############################################################################################################################
 ############################ BOOTSTRAP ########################################################################################
 ###############################################################################################################################
+    def smaller_data_loader(self, limit, loader):
+        i = 0
+        for i, el in enumerate(loader):
+            i += 1
+            if i >= limit:
+                yield el
+                return
+            else:
+                yield el
+
     @torch.no_grad()
     def bootstrap(self):
         if self.training_task == 'autoencoding':
@@ -861,6 +1010,9 @@ class Typhon(object):
         self.load_data('bootstrap')
 
         best = {dset:{} for dset in self.dsets_names}
+
+        nb_epochs = int(self.bootstrap_images / self.batch_size['train'])
+        assert nb_epochs > 0, f'bootstrap_images ({self.bootstrap_images}) must be >= of training batch size ({self.batch_size["train"]})!'
 
         for nmodel in tqdm(range(self.bootstrap_size)):
             # Take the dropouts of the training (no impact since we only test)
@@ -884,10 +1036,22 @@ class Typhon(object):
 
                 # Test model
                 print(f">>> {dset_name}")
+                # metrics_test = self.test_model(
+                #     model=model,
+                #     dset_name=dset_name,
+                #     test_data_loader=self.bootstrap_data_loaders[dset_name])
+
+
+
+
+
                 metrics_test = self.test_model(
                     model=model,
                     dset_name=dset_name,
-                    test_data_loader=self.bootstrap_data_loaders[dset_name])
+                    test_data_loader=self.smaller_data_loader(nb_epochs, self.bootstrap_data_loaders[dset_name]))
+
+
+
 
                 current[dset_name] = metrics_test
 
@@ -979,16 +1143,6 @@ class Typhon(object):
 
         best = {dset:{} for dset in self.dsets_names}
 
-        def smaller_data_loader(limit, loader):
-            i = 0
-            for i, el in enumerate(loader):
-                i += 1
-                if i >= limit:
-                    yield el
-                    return
-                else:
-                    yield el
-
         # Evaluate 250 images
         nb_epochs = int(self.bootstrap_images / self.batch_size['train'])
         assert nb_epochs > 0, f'bootstrap_images ({self.bootstrap_images}) must be >= of training batch size ({self.batch_size["train"]})!'
@@ -1018,7 +1172,7 @@ class Typhon(object):
                 metrics_test = self.test_model(
                     model=model,
                     dset_name=dset_name,
-                    test_data_loader=smaller_data_loader(nb_epochs, self.bootstrap_data_loaders[dset_name]))
+                    test_data_loader=self.smaller_data_loader(nb_epochs, self.bootstrap_data_loaders[dset_name]))
                     # test_data_loader=self.bootstrap_data_loaders[dset_name])
                     # test_data_loader=self.validation_data_loaders[dset_name]) # Use only validation, to be faster (dsets are already generated with the purpose of having different images)
 

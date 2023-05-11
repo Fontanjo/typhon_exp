@@ -5,6 +5,7 @@ from torchvision import models
 import torch.nn.functional as F
 from functools import partial
 
+pretrained = False
 
 # Adapted model from: https://github.com/mniwk/RF-Net/tree/main/models
 def get_block(dropout, in_channels=1):
@@ -53,8 +54,8 @@ class Res_net_container(nn.Module):
         super(Res_net_container, self).__init__()
 
         # Original paper they used pretrained weights
-        self.resnet = models.resnet34()
-        # self.resnet = models.resnet34(pretrained=True)
+        # self.resnet = models.resnet34()
+        self.resnet = models.resnet34(pretrained=pretrained)
         # Disable bias for convolutions direclty followed by a batch norm
         # https://pytorch.org/tutorials/recipes/recipes/tuning_guide.html
         self.firstconv = nn.Conv2d(in_channels, 64, kernel_size=7, stride=2, padding=3, bias=False)
