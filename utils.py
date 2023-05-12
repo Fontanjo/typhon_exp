@@ -29,7 +29,7 @@ class SegmentationDatasetFolder(torchvision.datasets.DatasetFolder):
         img = self.loader(img_path)
         # assert img.max() <= 1, f'Wrong format for {self.data[idx]}'
         # assert img.min() >= 0, f'Wrong format for {self.data[idx]}'
-        img_mask = self.loader(img_mask_path).to(torch.float16)
+        img_mask = self.loader(img_mask_path)
         # Ensure the sizes are correct
         if self.img_dim is not None:
             # Second argument in torch padding requires the size to add "before last dimension", "after last dimension", "before second-to-last dimension", ...
