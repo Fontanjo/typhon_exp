@@ -6,6 +6,7 @@ import torchvision
 import glob
 import time
 from scipy import ndimage
+from PIL import Image
 
 
 class SegmentationDatasetFolder(torchvision.datasets.DatasetFolder):
@@ -39,20 +40,50 @@ class SegmentationDatasetFolder(torchvision.datasets.DatasetFolder):
         return img, img_mask
 
 
+# class AutoencodingDatasetFolder(torchvision.datasets.DatasetFolder):
+#     def __init__(self, loader, path, cuda_device='cpu', img_dim=None, remove_mode=True):
+#         self.loader = loader
+#         self.cuda_device = cuda_device
+#         self.imgs_path = path
+#         file_list = glob.glob(self.imgs_path + "*.npy") # All .npy files
+#         self.data = []
+#         for img in file_list:
+#             self.data.append(img)
+#         self.img_dim = img_dim
+#         self.num_samples = len(self.data)
+#         self.remove_mode = remove_mode
+#         if self.remove_mode:
+#             self.mode_img = self.get_dset_mode(100)
+#
+#     def __len__(self):
+#         return len(self.data)
+#
+#     def __getitem__(self, idx):
+#         img_path = self.data[idx]
+#         img = self.loader(img_path)
+#         # Ensure the sizes are correct
+#         if self.img_dim is not None:
+#             # Second argument in torch padding requires the size to add "before last dimension", "after last dimension", "before second-to-last dimension", ...
+#             img = torch.nn.functional.pad(img, (0, self.img_dim[1], 0, self.img_dim[0]), 'constant', 0)[:, :self.img_dim[0], :self.img_dim[1]]
+#         if self.remove_mode:
+#             # Remove mode image
+#             img -= self.mode_img
+#             img = torch.abs(img)
+#         # Return img as input and as label
+#         return img, img
+
+# Use png
 class AutoencodingDatasetFolder(torchvision.datasets.DatasetFolder):
-    def __init__(self, loader, path, cuda_device='cpu', img_dim=None, remove_mode=True):
+    def __init__(self, loader, path, cuda_device, img_dim=None, remove_mode=None):
         self.loader = loader
         self.cuda_device = cuda_device
         self.imgs_path = path
-        file_list = glob.glob(self.imgs_path + "*.npy") # All .npy files
+        file_list = glob.glob(self.imgs_path + "*.png") # All .png files
         self.data = []
         for img in file_list:
             self.data.append(img)
         self.img_dim = img_dim
         self.num_samples = len(self.data)
-        self.remove_mode = remove_mode
-        if self.remove_mode:
-            self.mode_img = self.get_dset_mode(100)
 
     def __len__(self):
         return len(self.data)
@@ -64,13 +95,8 @@ class AutoencodingDatasetFolder(torchvision.datasets.DatasetFolder):
         if self.img_dim is not None:
             # Second argument in torch padding requires the size to add "before last dimension", "after last dimension", "before second-to-last dimension", ...
             img = torch.nn.functional.pad(img, (0, self.img_dim[1], 0, self.img_dim[0]), 'constant', 0)[:, :self.img_dim[0], :self.img_dim[1]]
-        if self.remove_mode:
-            # Remove mode image
-            img -= self.mode_img
-            img = torch.abs(img)
         # Return img as input and as label
         return img, img
-
 
     def get_dset_mode(self, nb_samples=10):
         imgs = []
@@ -198,20 +224,37 @@ def segmentation_loader(cuda_device):
     return the_loader
 
 
+# def autoencoding_loader(cuda_device):
+#     def the_loader(path):
+#         # Load data
+#         ary = np.load(path)
+#         # print(ary.shape)
+#         # Move color channel in front
+#         ary = ary.transpose(2, 0, 1)
+#         # print(ary.shape)
+#         # Normalize
+#         ary = np.divide(ary, 255)
+#         # Send the tensor to the GPU/CPU depending on what device is available
+#         tensor = torch.from_numpy(ary).float().to(cuda_device)
+#         return tensor
+#     return the_loader
+
+# Use png
 def autoencoding_loader(cuda_device):
     def the_loader(path):
-        # Load data
-        ary = np.load(path)
-        # print(ary.shape)
+        # Load image
+        img = Image.open(path)
+        # Convert to numpy array
+        ary = np.asarray(img)
         # Move color channel in front
         ary = ary.transpose(2, 0, 1)
-        # print(ary.shape)
         # Normalize
         ary = np.divide(ary, 255)
         # Send the tensor to the GPU/CPU depending on what device is available
         tensor = torch.from_numpy(ary).float().to(cuda_device)
         return tensor
     return the_loader
+
 
 
 # Just putting the cuda_device in a closure for the DatasetFolder loader

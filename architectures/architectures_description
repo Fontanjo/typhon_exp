@@ -81,3 +81,15 @@ vae5_mv
   same as vae3_mv, but takes an input of shape (210, 160, 3) (the shape of the atari images)
   the fe remains exactly the same
   the output_paddings in the decoder are set in order to reconstruct the correct initial shape
+
+
+
+
+
+AE11a -> AE10l but moving split directly after first encoding part
+
+AE11b -> Same as AE11a, but in dm add a convolution before the center (in dm) using kernel of 7, and going from 128 to 64
+
+AE11c -> Same as a, but add convolutional layer in fe to reduce from 128 to 64, the conv in dm to reduce from 64 to 16
+
+AE11d -> Same as a, but remove second convolution block from fe (128, 128, k=5) and move it to dm (basically anticipate split)
