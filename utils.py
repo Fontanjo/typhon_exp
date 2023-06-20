@@ -7,6 +7,7 @@ import glob
 import time
 from scipy import ndimage
 from PIL import Image
+import cv2
 
 
 class SegmentationDatasetFolder(torchvision.datasets.DatasetFolder):
@@ -243,7 +244,8 @@ def segmentation_loader(cuda_device):
 def autoencoding_loader(cuda_device):
     def the_loader(path):
         # Load image
-        img = Image.open(path)
+        # img = Image.open(path)                    # Load as RGB
+        img = cv2.imread(path, cv2.IMREAD_COLOR)    # Load as BGR     Not important which to use, but consistent with typhon.py save_sample()! (which uses BGR at the moment)
         # Convert to numpy array
         ary = np.asarray(img)
         # Move color channel in front
