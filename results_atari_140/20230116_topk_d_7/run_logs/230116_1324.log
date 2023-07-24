@@ -1,0 +1,49 @@
+Copying loss functions
+Copying optimizers
+> Config loaded successfully for parallel training:
+>> dsets_names: ['Phoenix-v5', 'DemonAttack-v5', 'Qbert-v5']
+>> architecture: AE9d
+>> initialization: random
+>> bootstrap_size: 2000
+>> bootstrap_images: 160
+>> nb_batches_per_epoch: 1
+>> nb_epochs: {'train': 100000, 'spec': 0}
+>> lrates: {'train': {'Phoenix-v5': 5e-06, 'DemonAttack-v5': 5e-06, 'Qbert-v5': 5e-06}, 'spec': {'Phoenix-v5': 1e-05, 'DemonAttack-v5': 1e-05, 'Qbert-v5': 1e-05}, 'frozen': {'Phoenix-v5': 0.001, 'DemonAttack-v5': 0.001, 'Qbert-v5': 0.001}}
+>> dropouts: {'train': [0.1, {'Phoenix-v5': 0.1, 'DemonAttack-v5': 0.1, 'Qbert-v5': 0.1}], 'spec': [0.0, {'Phoenix-v5': 0.0, 'DemonAttack-v5': 0.0, 'Qbert-v5': 0.0}], 'frozen': [0.0, {'Phoenix-v5': 0.0, 'DemonAttack-v5': 0.0, 'Qbert-v5': 0.0}]}
+>> batch_size: {'train': 8, 'spec': 64}
+>> loss_functions: {'Phoenix-v5': BCELoss(), 'DemonAttack-v5': BCELoss(), 'Qbert-v5': BCELoss()}
+>> optim_class: {'Phoenix-v5': <class 'torch.optim.adam.Adam'>, 'DemonAttack-v5': <class 'torch.optim.adam.Adam'>, 'Qbert-v5': <class 'torch.optim.adam.Adam'>}
+>> opt_metrics: {'bootstrap': 'loss', 'train': 'loss', 'spec': 'accuracy'}
+>> metrics_freq: {'train': 1000, 'spec': 10}
+>> training_task: autoencoding
+>> mu_var_loss: False
+>> cuda_device: cuda:7
+>> resume: False
+>> img_dims: {'Phoenix-v5': None, 'DemonAttack-v5': None, 'Qbert-v5': None}
+>> remove_mode: False
+> Removing old bootstrap model: results_atari/20230116_topk_d_7/models/bootstrap_model.pth
+RANDOM INITIALIZATION -- 2023-01-16 13:24:49
+> Random initialization done, model is saved
+PARALLEL TRAINING -- 2023-01-16 13:24:49
+> Loading data
+>> Data loaded for dataset /dev/shm/datasets_autoencoding/Phoenix-v5
+                    train: 4041 images
+                    validation: 505 images
+                    test: 505 images
+                
+>> Data loaded for dataset /dev/shm/datasets_autoencoding/DemonAttack-v5
+                    train: 4535 images
+                    validation: 566 images
+                    test: 567 images
+                
+>> Data loaded for dataset /dev/shm/datasets_autoencoding/Qbert-v5
+                    train: 4141 images
+                    validation: 517 images
+                    test: 517 images
+                
+> All data loaded
+> Loading models from results_atari/20230116_topk_d_7/models/bootstrap_model.pth and optimizers
+> Models and optimizers loaded
+torch.Size([1, 1, 33600])
+torch.Size([1, 1, 64])
+torch.Size([1, 1, 33600])

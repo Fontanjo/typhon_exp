@@ -5,7 +5,8 @@ import mmap
 
 
 
-FILE_PATH = "./results/metrics_log/20221119_bootstrap_iou.log"
+# FILE_PATH = "./results/metrics_log/20221119_bootstrap_iou.log"
+FILE_PATH = "./results/20221122_BraTS_LGG_iou_longer_0/run_logs/221122_0908.log"
 
 def main():
 
